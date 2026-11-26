@@ -1,4 +1,4 @@
-export type HostScope = "user" | "project" | "hub-home";
+export type HostScope = "user" | "project";
 
 export interface HomeOverride {
   key: string;
@@ -10,6 +10,7 @@ export interface HostConfig {
   scope: HostScope;
   path: string;
   override?: HomeOverride;
+  defaultSiblingRoot?: string;
   routeVariables?: readonly string[];
   mergedFiles?: readonly string[];
   personalSource?: { profile: "claude" | "codex"; orcaHomeVariable: "ORCA_USER_DATA_PATH" };
@@ -23,6 +24,7 @@ export interface HostDefinition {
   id: string;
   files: readonly HostConfig[];
   format: HostFormat;
+  /** Minimum fields read by the host. Additional entry fields pass through. */
   entry: Readonly<Record<string, string>>;
   verified: readonly [string, ...string[]];
 }
@@ -36,6 +38,7 @@ export const HOSTS = {
     files: [{
       scope: "user",
       path: ".claude.json",
+      defaultSiblingRoot: ".claude",
       override: { key: "CLAUDE_CONFIG_DIR", rule: "trim-presence", directory: "" },
       personalSource: { profile: "claude", orcaHomeVariable: "ORCA_USER_DATA_PATH" },
     }],

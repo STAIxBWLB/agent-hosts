@@ -6,14 +6,14 @@ import { SETUP_CONFIG_BYTES } from "./toml.ts";
 import { EntryRefusal } from "./refusal.ts";
 
 export type LegacyReceipt =
-  | { kind: "agent-mem"; path: string; before: ConfigImage; after: ConfigImage }
+  | { kind: "agent-mem"; path: string; before: ConfigImage; after: ConfigImage; intent: string }
   | { kind: "entry"; path: string; existed: boolean; keyExisted: boolean; prior: unknown; priorToml?: string; installed: unknown };
 
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
 function invalid(path: string, reason: string): never {
-  throw new EntryRefusal("invalid-receipt", `${path}: ${reason}; inspect the receipt or use the consumer release that wrote it`);
+  throw new EntryRefusal("invalid-receipt", `${path}: ${reason}; inspect the receipt or use the consumer release that wrote it`, { file: path });
 }
 
 function memoryReceipt(path: string, target: ReceiptTarget, candidates: readonly string[], raw: unknown): LegacyReceipt {
@@ -28,7 +28,7 @@ function memoryReceipt(path: string, target: ReceiptTarget, candidates: readonly
     || change.after.bytes === null || (change.start !== undefined && !isConfigImage(change.start))) {
     return invalid(path, "agent-mem MCP image does not match the selected configuration");
   }
-  return { kind: "agent-mem", path, before: change.before, after: change.after };
+  return { kind: "agent-mem", path, before: change.before, after: change.after, intent: raw.intent };
 }
 
 function entryReceipt(path: string, target: ReceiptTarget, file: string, raw: unknown): LegacyReceipt {

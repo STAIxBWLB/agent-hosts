@@ -1,9 +1,10 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
+import * as fs from "node:fs";
 import { createHash } from "node:crypto";
 import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, truncateSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { applyEntry, EntryRefusal, planEntry, realPath, REFUSAL_CODES, resolveHostPaths, SETUP_CONFIG_BYTES, undoEntry, type ConfigImage, type RefusalCode } from "@staix/agent-hosts";
+import { applyEntry, EntryRefusal, planEntry, readEntryReceipt, realPath, REFUSAL_CODES, resolveHostPaths, SETUP_CONFIG_BYTES, undoEntry, type ConfigImage, type RefusalCode } from "@staix/agent-hosts";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -193,3 +194,74 @@ function expectRefusal(run: () => unknown, code: RefusalCode): void {
   }
   throw new Error(`expected refusal ${code}`);
 }
+
+function failConfigPublication(file: string, run: () => void): void {
+  const rename = fs.renameSync;
+  const mock = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+    if (to === file) throw new Error("injected config publication failure");
+    rename(from, to);
+  });
+  try {
+    run();
+  } finally {
+    mock.mockRestore();
+  }
+}
+
+test("a first failed publication leaves a resumable v1 journal, and undo can cancel it", () => {
+  const { file, target, receiptDir } = fixture();
+  const options = { ...target, receiptDir };
+  const plan = planEntry({ ...target, entry: { command: "ours" } });
+  failConfigPublication(file, () => {
+    expect(() => applyEntry(plan, options)).toThrow("injected config publication failure");
+  });
+  expect(readEntryReceipt(options)?.pending?.kind).toBe("apply");
+  expect(existsSync(file)).toBe(false);
+  expect(undoEntry(options)).toMatchObject({ change: "unchanged", code: "no-receipt" });
+  expect(readEntryReceipt(options)).toBeUndefined();
+
+  failConfigPublication(file, () => {
+    expect(() => applyEntry(plan, options)).toThrow("injected config publication failure");
+  });
+  expect(applyEntry(plan, options).change).toBe("add");
+  expect(readEntryReceipt(options)?.pending).toBeUndefined();
+});
+
+test("undo of an unpublished replacement restores and uses its previous completed receipt", () => {
+  const { file, target, receiptDir } = fixture();
+  const options = { ...target, receiptDir };
+  mkdirSync(dirname(file), { recursive: true });
+  const baseline = '{"mcpServers":{"managed":{"command":"original"}}}';
+  writeFileSync(file, baseline);
+  const installed = applyEntry(planEntry({ ...target, entry: { command: "first" } }), options);
+  const replacement = planEntry({ ...target, entry: { command: "second" } });
+  failConfigPublication(file, () => {
+    expect(() => applyEntry(replacement, options)).toThrow("injected config publication failure");
+  });
+  expect(readEntryReceipt(options)?.pending?.kind).toBe("apply");
+  expect(undoEntry(options)).toMatchObject({ change: "restored", intent: installed.intent });
+  expect(readFileSync(file, "utf8")).toBe(baseline);
+  expect(readEntryReceipt(options)).toBeUndefined();
+  expect(fs.readdirSync(receiptDir)).toEqual([]);
+});
+
+test("undo of an already published pending apply names its receipt and asks for retry", () => {
+  const { file, target, receiptDir } = fixture();
+  const plan = planEntry({ ...target, entry: { command: "fixture" } });
+  if (plan.change === "refused") throw new Error(plan.reason);
+  const applied = applyEntry(plan, { receiptDir });
+  const receipt = JSON.parse(readFileSync(applied.receipt, "utf8"));
+  writeFileSync(applied.receipt, JSON.stringify({
+    ...receipt, pending: { kind: "apply", start: imageKey(plan.before), result: imageKey(plan.after) },
+  }));
+  try {
+    undoEntry({ ...target, receiptDir });
+    throw new Error("expected a pending apply refusal");
+  } catch (error) {
+    if (!(error instanceof EntryRefusal)) throw error;
+    expect(error.code).toBe("pending-operation");
+    expect(error.file).toBe(applied.receipt);
+    expect(error.reason).toContain("retry the interrupted apply");
+  }
+  expect(existsSync(file)).toBe(true);
+});

@@ -30,7 +30,7 @@ export interface Receipt extends ReceiptTarget {
 
 export function receiptPath(directory: string, target: ReceiptTarget): string {
   if (!isAbsolute(directory) || resolve(directory) !== directory) {
-    throw new EntryRefusal("unsafe-path", `${directory}: supply an absolute receipt directory without redirects or parent segments`);
+    throw new EntryRefusal("unsafe-path", `${directory}: supply an absolute receipt directory without redirects or parent segments`, { file: directory });
   }
   return join(directory, `entry-${digest([target.file, target.name])}.json`);
 }
@@ -55,7 +55,7 @@ export function readReceiptValue(path: string, limit: number): { image: ConfigIm
     const text = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(image.bytes, "base64"));
     return { image, value: JSON.parse(text) };
   } catch (cause) {
-    throw new EntryRefusal("invalid-receipt", `${path}: invalid receipt JSON; inspect or restore the original receipt before retrying`, { cause });
+    throw new EntryRefusal("invalid-receipt", `${path}: invalid receipt JSON; inspect or restore the original receipt before retrying`, { cause, file: path });
   }
 }
 
@@ -63,7 +63,7 @@ export function readReceipt(path: string, target: ReceiptTarget): { image: Confi
   const { image, value } = readReceiptValue(path, RECEIPT_BYTES);
   if (image.bytes === null) return { image };
   const refuse = (): never => {
-    throw new EntryRefusal("invalid-receipt", `${path}: invalid or unsupported receipt; inspect or restore the original receipt before retrying`);
+    throw new EntryRefusal("invalid-receipt", `${path}: invalid or unsupported receipt; inspect or restore the original receipt before retrying`, { file: path });
   };
   if (!isRecord(value) || value.version !== 1 || value.host !== target.host || value.file !== target.file
     || value.name !== target.name || !isDigest(value.intent) || !isConfigImage(value.before) || !isConfigImage(value.after)) return refuse();
@@ -79,4 +79,39 @@ export function writeReceipt(path: string, expected: ConfigImage, receipt?: Rece
   const image = { bytes, mode: 0o600 };
   publishImage(path, RECEIPT_BYTES, expected, image);
   return image;
+}
+
+export function findPackageReceipt(directory: string, target: ReceiptTarget, legacyPaths: readonly string[] = []) {
+  const path = receiptPath(directory, target);
+  const selected = readReceipt(path, target);
+  if (selected.receipt) return { path, ...selected };
+  for (const file of new Set(legacyPaths)) {
+    if (file === target.file) continue;
+    const historical = { ...target, file };
+    const legacyPath = receiptPath(directory, historical);
+    const found = readReceipt(legacyPath, historical);
+    if (found.receipt) return { path: legacyPath, ...found };
+  }
+  return { path, ...selected };
+}
+
+// Save the previous completed v1 receipt independently of the new v1 journal.
+// The pending hashes bind the sidecar to the operation that can roll it back.
+export function recoveryPath(path: string, pending: NonNullable<Receipt["pending"]>): string {
+  return path + ".previous-" + digest([pending.start, pending.result]);
+}
+
+export function writeRecovery(path: string, pending: NonNullable<Receipt["pending"]>, previous: Receipt): void {
+  const backup = recoveryPath(path, pending);
+  const { image } = readReceipt(backup, previous);
+  writeReceipt(backup, image, previous);
+}
+
+export function readRecovery(path: string, receipt: Receipt & { pending: NonNullable<Receipt["pending"]> }) {
+  const backup = recoveryPath(path, receipt.pending);
+  const saved = readReceipt(backup, receipt);
+  if (saved.receipt?.pending) {
+    throw new EntryRefusal("invalid-receipt", `${backup}: invalid recovery receipt; inspect it before retrying`, { file: backup });
+  }
+  return { path: backup, ...saved };
 }

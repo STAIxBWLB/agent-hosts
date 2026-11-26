@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { realPath, resolveHostPaths, undoEntry, type HostId } from "@staix/agent-hosts";
+import { applyEntry, planEntry, readEntryReceipt, realPath, resolveHostPaths, undoEntry, type HostId } from "@staix/agent-hosts";
 
 const roots: string[] = [];
 afterEach(() => { for (const home of roots.splice(0)) rmSync(home, { recursive: true, force: true }); });
@@ -70,7 +70,7 @@ test.each([
   ["vault-mem", 1], ["agent-research", 1], ["agent-mem", 1], ["agent-mem", 2],
 ] as const)("%s v%i emitted receipt restores its MCP before-image", (consumer, version) => {
   const { file, receiptFile, receipt, before, target, hookFile, hookText } = replay(consumer, version);
-  expect(undoEntry(target)).toEqual({ change: "restored", file, receipt: receiptFile, legacy: true });
+  expect(undoEntry(target)).toMatchObject({ change: "restored", file, receipt: receiptFile, legacy: true });
   expect(readFileSync(file, "utf8")).toBe(before);
   expect(readFileSync(receiptFile, "utf8")).toBe(receipt);
   if (hookFile && hookText) expect(readFileSync(hookFile, "utf8")).toBe(hookText);
@@ -162,7 +162,7 @@ test.each([
   const { file, receiptFile, receipt, before, target } = replay(consumer, version);
   undoEntry(target);
   const inode = statSync(file).ino;
-  expect(undoEntry(target)).toEqual({ change: "unchanged", code: "entry-already-restored", file, receipt: receiptFile, legacy: true });
+  expect(undoEntry(target)).toMatchObject({ change: "unchanged", code: "entry-already-restored", file, receipt: receiptFile, legacy: true });
   expect(statSync(file).ino).toBe(inode);
   expect(readFileSync(file, "utf8")).toBe(before);
   expect(readFileSync(receiptFile, "utf8")).toBe(receipt);
@@ -173,4 +173,49 @@ test("a retained legacy receipt distinguishes an already absent entry from no re
   put(receiptFile, JSON.stringify({ ...JSON.parse(receipt), prior: null }));
   expect(undoEntry(target).change).toBe("removed");
   expect(undoEntry(target)).toMatchObject({ change: "unchanged", code: "entry-already-absent", legacy: true });
+});
+
+test.each([
+  ["vault-mem", 1], ["agent-research", 1], ["agent-mem", 1], ["agent-mem", 2],
+] as const)("%s v%i is superseded without losing its original prior entry", (consumer, version) => {
+  const { file, receiptFile, receipt, before, target } = replay(consumer, version);
+  expect(readEntryReceipt(target)).toMatchObject({ file, receipt: receiptFile, legacy: true });
+  const plan = planEntry({ ...target, entry: { command: "new", args: ["mcp"] } });
+  if (plan.change === "refused") throw new Error(plan.reason);
+  expect(plan.current).toHaveProperty("command");
+  const applied = applyEntry(plan, { receiptDir: target.receiptDir });
+  expect(applied).toMatchObject({ change: "replace", intent: plan.intent, legacy: true, supersedes: receiptFile });
+  const modern = readEntryReceipt(target);
+  expect(modern).toMatchObject({ file, receipt: applied.receipt, intent: plan.intent, before: asImage(before) });
+  expect(modern?.legacy).toBeUndefined();
+  expect(readFileSync(receiptFile, "utf8")).toBe(receipt);
+  expect(undoEntry(target)).toMatchObject({ change: "restored", intent: plan.intent });
+  expect(readFileSync(file, "utf8")).toBe(before);
+  expect(undoEntry(target)).toMatchObject({ change: "unchanged", code: "entry-already-restored", legacy: true });
+});
+
+test("a foreign legacy entry blocks promotion and names the file", () => {
+  const { file, target } = replay("agent-research", 1);
+  const current = '{"mcpServers":{"ares":{"command":"another","args":[]}}}';
+  put(file, current);
+  const plan = planEntry({ ...target, entry: { command: "ours", args: ["mcp"] } });
+  expect(() => applyEntry(plan, { receiptDir: target.receiptDir })).toThrow("managed entry changed since installation");
+  expect(readFileSync(file, "utf8")).toBe(current);
+  expect(readEntryReceipt(target)?.legacy).toBe(true);
+});
+
+test("Jcode legacy undo leaves a sibling alias intact and restores only the canonical entry", () => {
+  const host = "jcode", home = scratch(), name = "amem";
+  const paths = resolveHostPaths({ home, env: {}, hosts: [host] });
+  const file = paths.paths.jcode![0]!, receiptDir = join(home, "receipts");
+  const prior = '{"mcpServers":{"amem":{"command":"prior"},"outside":{"command":"untouched"}}}';
+  const installed = '{"servers":{"amem":{"command":"installed"},"outside":{"command":"untouched"}}}';
+  const alias = '"mcpServers" : { "amem" : { "command" : "separate" } }';
+  put(file, installed.slice(0, -1) + "," + alias + "}");
+  put(join(receiptDir, "jcode.json"), JSON.stringify({
+    version: 1, target: host, intent: "a".repeat(64), phase: "applied",
+    changes: [{ key: "jcode:0", path: file, before: asImage(prior), after: asImage(installed) }],
+  }));
+  expect(undoEntry({ host, paths, name, receiptDir }).change).toBe("restored");
+  expect(readFileSync(file, "utf8")).toBe(installed.replace('"installed"', '"prior"').slice(0, -1) + "," + alias + "}");
 });

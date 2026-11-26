@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { HOSTS, resolveHostPaths } from "@staix/agent-hosts";
 
 const temporary: string[] = [];
@@ -33,6 +33,10 @@ test("resolves only the verified MCP files under the supplied home by default", 
     legacyPaths: expected,
     redirects: [],
     refusals: [],
+    roots: Object.fromEntries(Object.entries(expected).map(([host, [file]]) => {
+      const root = host === "claude" ? join(home, ".claude") : dirname(file!);
+      return [host, { current: [root], legacy: [root] }];
+    })),
   });
   for (const [id, host] of Object.entries(HOSTS)) {
     expect<string>(host.id).toBe(id);
@@ -106,8 +110,12 @@ test.each(["codex-accounts/example/home", "codex-runtime-home/home"])(
     symlinkSync(claudeProfile, claudeAlias, "dir");
     const env = { ORCA_USER_DATA_PATH: ` ${orca} `, CLAUDE_CONFIG_DIR: claudeAlias, CODEX_HOME: codexProfile };
     const hosts = ["claude", "codex"] as const;
-    const { paths, legacyPaths, redirects } = resolveHostPaths({ env, home, hosts });
+    const { paths, legacyPaths, redirects, roots } = resolveHostPaths({ env, home, hosts });
     expect(paths).toEqual({ claude: [join(home, ".claude.json")], codex: [join(home, ".codex/config.toml")] });
+    expect(roots).toEqual({
+      claude: { current: [join(home, ".claude")], legacy: [claudeAlias] },
+      codex: { current: [join(home, ".codex")], legacy: [codexProfile] },
+    });
     expect(legacyPaths).toEqual({ claude: [join(claudeAlias, ".claude.json")], codex: [join(codexProfile, "config.toml")] });
     expect(redirects).toEqual([
       { target: "claude", from: join(claudeAlias, ".claude.json"), to: join(home, ".claude.json"), reason: "Orca re-syncs this managed file from the personal source" },
@@ -115,6 +123,10 @@ test.each(["codex-accounts/example/home", "codex-runtime-home/home"])(
     ]);
     expect(resolveHostPaths({ env, home, hosts, redirectManagedProfiles: false })).toEqual({
       home, paths: legacyPaths, legacyPaths, redirects: [], refusals: [],
+      roots: {
+        claude: { current: [claudeAlias], legacy: [claudeAlias] },
+        codex: { current: [codexProfile], legacy: [codexProfile] },
+      },
     });
   },
 );
