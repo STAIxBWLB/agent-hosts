@@ -1,6 +1,6 @@
 {
   "name": "@staix/agent-hosts",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Host configuration and MCP server entry management for Bun",
   "type": "module",
   "repository": {
