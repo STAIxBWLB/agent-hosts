@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { ConfigImage } from "./json.ts";
 import { isConfigImage, readReceiptValue, type ReceiptTarget } from "./receipt.ts";
 import { SETUP_CONFIG_BYTES } from "./toml.ts";
+import { EntryRefusal } from "./refusal.ts";
 
 export type LegacyReceipt =
   | { kind: "agent-mem"; path: string; before: ConfigImage; after: ConfigImage }
@@ -12,7 +13,7 @@ const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
 function invalid(path: string, reason: string): never {
-  throw new Error(`${path}: ${reason}; inspect the receipt or use the consumer release that wrote it`);
+  throw new EntryRefusal("invalid-receipt", `${path}: ${reason}; inspect the receipt or use the consumer release that wrote it`);
 }
 
 function memoryReceipt(path: string, target: ReceiptTarget, candidates: readonly string[], raw: unknown): LegacyReceipt {

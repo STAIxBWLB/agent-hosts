@@ -1,6 +1,7 @@
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { HOSTS, type HostDefinition, type HostId, type HostScope, type HomeOverride } from "./hosts.ts";
 import { realPath } from "./platform.ts";
+import type { RefusalCode } from "./refusal.ts";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -22,12 +23,21 @@ export interface HostRedirect {
   reason: string;
 }
 
+export interface HostRefusal {
+  host: HostId;
+  code: RefusalCode;
+  variable?: string;
+  file?: string;
+  reason: string;
+}
+
 export interface HostPaths {
   home: string;
   paths: Partial<Record<HostId, string[]>>;
   /** Pre-redirect paths for validating receipts from older setup versions. */
   legacyPaths: Partial<Record<HostId, string[]>>;
   redirects: HostRedirect[];
+  refusals: HostRefusal[];
 }
 
 function canonical(path: string): string {
@@ -48,19 +58,29 @@ function orcaHome(root: string, kind: "claude" | "codex", orcaRoot: string): boo
       || parts.length === 2 && parts[0] === "codex-runtime-home" && parts[1] === "home";
 }
 
-function configRoot(override: HomeOverride, env: Environment, home: string): string {
+function configRoot(override: HomeOverride, env: Environment, home: string): string | Omit<HostRefusal, "host"> {
   const { directory, key, rule } = override;
-  const setting = env[key];
-  const fallback = join(home, directory);
-  if (rule === "absolute-only") return setting && isAbsolute(setting) ? resolve(setting) : fallback;
-  const present = rule === "empty-means-set" ? setting !== undefined : rule === "expand-tilde" ? !!setting : !!setting?.trim();
-  if (!present || setting === undefined) return fallback;
+  const setting = rule === "trim-presence" ? env[key]?.trim() : env[key];
+  if (setting === undefined) return join(home, directory);
+  if (setting === "") {
+    return rule === "empty-means-set"
+      ? { code: "empty-override", variable: key, reason: `${key} is set but empty; unset it or supply an absolute directory` }
+      : join(home, directory);
+  }
   const expanded = rule === "expand-tilde" && /^~(?:[/\\]|$)/.test(setting)
     ? join(home, ...setting.slice(2).split(/[/\\]/))
     : setting;
+  if (!isAbsolute(expanded)) {
+    return { code: "relative-override", variable: key, reason: `${key} is relative; unset it or supply an absolute directory` };
+  }
   const given = resolve(expanded);
+  if (rule === "absolute-only") return given;
   const withinHome = relative(resolve(env.HOME?.trim() || home), given);
   return withinHome !== ".." && !withinHome.startsWith(".." + sep) && !isAbsolute(withinHome) ? join(home, withinHome) : given;
+}
+
+export function openCodeRouteReason(variable: string, file: string): string {
+  return `${variable} routes OpenCode away from ${file}; unset it and resolve paths again before applying`;
 }
 
 /** Resolve MCP paths, without opening configuration files. Publishers still guard the selected paths. */
@@ -69,8 +89,10 @@ export function resolveHostPaths(options: ResolveHostPathsOptions): HostPaths {
   const paths: HostPaths["paths"] = {};
   const legacyPaths: HostPaths["legacyPaths"] = {};
   const redirects: HostRedirect[] = [];
+  const refusals: HostRefusal[] = [];
   for (const target of new Set(hosts ?? (Object.keys(HOSTS) as HostId[]))) {
     const host: HostDefinition = HOSTS[target];
+    const firstRefusal = refusals.length;
     const current: string[] = [];
     const legacy: string[] = [];
     for (const file of host.files) {
@@ -78,7 +100,19 @@ export function resolveHostPaths(options: ResolveHostPathsOptions): HostPaths {
       const base = file.scope === "project" ? workspaceRoot : home;
       if (base === undefined) continue;
       const root = file.override ? configRoot(file.override, env, base) : base;
+      if (typeof root !== "string") {
+        refusals.push({ host: target, ...root });
+        continue;
+      }
       const from = join(root, file.path);
+      for (const variable of file.routeVariables ?? []) {
+        if (env[variable]?.trim()) {
+          refusals.push({
+            host: target, code: "opencode-config-route", variable, file: from,
+            reason: openCodeRouteReason(variable, from),
+          });
+        }
+      }
       legacy.push(from);
       const personal = file.personalSource;
       if (redirectManagedProfiles && personal) {
@@ -92,8 +126,9 @@ export function resolveHostPaths(options: ResolveHostPathsOptions): HostPaths {
       }
       current.push(from);
     }
+    if (!current.length && refusals.length !== firstRefusal) continue;
     paths[target] = current;
     legacyPaths[target] = legacy;
   }
-  return { home, paths, legacyPaths, redirects };
+  return { home, paths, legacyPaths, redirects, refusals };
 }

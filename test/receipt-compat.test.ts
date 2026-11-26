@@ -162,8 +162,15 @@ test.each([
   const { file, receiptFile, receipt, before, target } = replay(consumer, version);
   undoEntry(target);
   const inode = statSync(file).ino;
-  expect(undoEntry(target)).toEqual({ change: "unchanged", file, receipt: receiptFile, legacy: true });
+  expect(undoEntry(target)).toEqual({ change: "unchanged", code: "entry-already-restored", file, receipt: receiptFile, legacy: true });
   expect(statSync(file).ino).toBe(inode);
   expect(readFileSync(file, "utf8")).toBe(before);
   expect(readFileSync(receiptFile, "utf8")).toBe(receipt);
+});
+
+test("a retained legacy receipt distinguishes an already absent entry from no receipt", () => {
+  const { receiptFile, receipt, target } = replay("vault-mem", 1);
+  put(receiptFile, JSON.stringify({ ...JSON.parse(receipt), prior: null }));
+  expect(undoEntry(target).change).toBe("removed");
+  expect(undoEntry(target)).toMatchObject({ change: "unchanged", code: "entry-already-absent", legacy: true });
 });

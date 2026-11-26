@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { dirname, isAbsolute, join, parse, resolve, sep } from "node:path";
 import type { ConfigImage } from "./json.ts";
 import { realPath } from "./platform.ts";
+import { EntryRefusal } from "./refusal.ts";
 
 const missing = (error: unknown): boolean => (error as NodeJS.ErrnoException)?.code === "ENOENT";
 const sameNode = (left: Stats, right: Stats): boolean => left.dev === right.dev && left.ino === right.ino;
@@ -14,7 +15,7 @@ export const sameImage = (left: ConfigImage, right: ConfigImage): boolean =>
 
 function checkPath(file: string, directory = false): Stats | undefined {
   if (!isAbsolute(file) || resolve(file) !== file) {
-    throw new Error(`${file}: supply an absolute path without redirects or parent segments`);
+    throw new EntryRefusal("unsafe-path", `${file}: supply an absolute path without redirects or parent segments`);
   }
   const root = parse(file).root;
   let path = root;
@@ -34,7 +35,7 @@ function checkPath(file: string, directory = false): Stats | undefined {
     }
     const needsDirectory = directory || index < parts.length - 1;
     if (stat.isSymbolicLink() || (needsDirectory ? !stat.isDirectory() : !stat.isFile() || stat.nlink !== 1)) {
-      throw new Error(`${file}: unsafe path component ${path}; use a plain file and directories without links`);
+      throw new EntryRefusal("unsafe-path", `${file}: unsafe path component ${path}; use a plain file and directories without links`);
     }
     existing = path;
   }
@@ -44,7 +45,7 @@ function checkPath(file: string, directory = false): Stats | undefined {
 
 function assertPhysical(file: string, existing: string): void {
   if (realPath(existing) !== existing) {
-    throw new Error(`${file}: redirected path; use the exact physical path spelling`);
+    throw new EntryRefusal("unsafe-path", `${file}: redirected path; use the exact physical path spelling`);
   }
 }
 
@@ -62,9 +63,9 @@ export function readImage(file: string, limit: number): ConfigImage {
   try {
     const stat = fstatSync(fd);
     if (!stat.isFile() || stat.nlink !== 1 || !sameNode(named, stat)) {
-      throw new Error(`${file}: path changed while opening; check the file and retry`);
+      throw new EntryRefusal("file-changed", `${file}: path changed while opening; check the file and retry`);
     }
-    if (stat.size > limit) throw new Error(`${file}: exceeds ${limit} bytes; reduce the file size before retrying`);
+    if (stat.size > limit) throw new EntryRefusal("size-limit", `${file}: exceeds ${limit} bytes; reduce the file size before retrying`);
     // Read one extra byte to detect growth, with a fixed upper bound even for a changing file.
     const buffer = Buffer.alloc(stat.size + 1);
     let length = 0;
@@ -75,10 +76,10 @@ export function readImage(file: string, limit: number): ConfigImage {
     }
     const end = fstatSync(fd);
     if (length !== stat.size || end.size !== stat.size || end.mtimeMs !== stat.mtimeMs || end.ctimeMs !== stat.ctimeMs) {
-      throw new Error(`${file}: changed while reading; rerun after the writer finishes`);
+      throw new EntryRefusal("file-changed", `${file}: changed while reading; rerun after the writer finishes`);
     }
     const current = checkPath(file);
-    if (!current || !sameNode(current, end)) throw new Error(`${file}: path changed while reading; check the file and retry`);
+    if (!current || !sameNode(current, end)) throw new EntryRefusal("file-changed", `${file}: path changed while reading; check the file and retry`);
     return { bytes: buffer.subarray(0, length).toString("base64"), mode: stat.mode & 0o7777 };
   } finally {
     closeSync(fd);
@@ -87,7 +88,7 @@ export function readImage(file: string, limit: number): ConfigImage {
 
 function verifyImage(file: string, limit: number, expected: ConfigImage): void {
   if (!sameImage(readImage(file, limit), expected)) {
-    throw new Error(`${file}: changed before publication; rerun the operation using the current file`);
+    throw new EntryRefusal("file-changed", `${file}: changed before publication; rerun the operation using the current file`);
   }
 }
 
@@ -99,7 +100,7 @@ export function publishImage(file: string, limit: number, expected: ConfigImage,
     return;
   }
   const bytes = Buffer.from(next.bytes, "base64");
-  if (bytes.length > limit) throw new Error(`${file}: output exceeds ${limit} bytes; reduce the entry size before retrying`);
+  if (bytes.length > limit) throw new EntryRefusal("size-limit", `${file}: output exceeds ${limit} bytes; reduce the entry size before retrying`);
   const directory = dirname(file);
   ensureDirectory(directory);
   const parent = lstatSync(directory);
@@ -112,7 +113,7 @@ export function publishImage(file: string, limit: number, expected: ConfigImage,
     verifyImage(file, limit, expected);
     const named = checkPath(temporary);
     if (!named || !sameNode(named, fstatSync(fd)) || !sameNode(parent, lstatSync(directory))) {
-      throw new Error(`${file}: directory or temporary file changed; check the path and retry`);
+      throw new EntryRefusal("file-changed", `${file}: directory or temporary file changed; check the path and retry`);
     }
     renameSync(temporary, file);
   } finally {
@@ -134,7 +135,7 @@ export function withConfigLock<T>(file: string, work: () => T): T {
     fd = openSync(lock, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code !== "EEXIST") throw error;
-    throw new Error(`${lock}: another apply or undo holds this lock; wait for it, or remove the lock manually after confirming the writer has stopped`);
+    throw new EntryRefusal("lock-held", `${lock}: another apply or undo holds this lock; wait for it, or remove the lock manually after confirming the writer has stopped`);
   }
   try {
     return work();

@@ -4,6 +4,7 @@ import { publishImage, readImage } from "./fs-safe.ts";
 import type { HostId } from "./hosts.ts";
 import type { ConfigImage } from "./json.ts";
 import { SETUP_CONFIG_BYTES } from "./toml.ts";
+import { EntryRefusal } from "./refusal.ts";
 
 const BASE64_LIMIT = Math.ceil(SETUP_CONFIG_BYTES / 3) * 4;
 // Two full configuration images plus metadata and pending-operation hashes.
@@ -29,7 +30,7 @@ export interface Receipt extends ReceiptTarget {
 
 export function receiptPath(directory: string, target: ReceiptTarget): string {
   if (!isAbsolute(directory) || resolve(directory) !== directory) {
-    throw new Error(`${directory}: supply an absolute receipt directory without redirects or parent segments`);
+    throw new EntryRefusal("unsafe-path", `${directory}: supply an absolute receipt directory without redirects or parent segments`);
   }
   return join(directory, `entry-${digest([target.file, target.name])}.json`);
 }
@@ -54,7 +55,7 @@ export function readReceiptValue(path: string, limit: number): { image: ConfigIm
     const text = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(image.bytes, "base64"));
     return { image, value: JSON.parse(text) };
   } catch (cause) {
-    throw new Error(`${path}: invalid receipt JSON; inspect or restore the original receipt before retrying`, { cause });
+    throw new EntryRefusal("invalid-receipt", `${path}: invalid receipt JSON; inspect or restore the original receipt before retrying`, { cause });
   }
 }
 
@@ -62,7 +63,7 @@ export function readReceipt(path: string, target: ReceiptTarget): { image: Confi
   const { image, value } = readReceiptValue(path, RECEIPT_BYTES);
   if (image.bytes === null) return { image };
   const refuse = (): never => {
-    throw new Error(`${path}: invalid or unsupported receipt; inspect or restore the original receipt before retrying`);
+    throw new EntryRefusal("invalid-receipt", `${path}: invalid or unsupported receipt; inspect or restore the original receipt before retrying`);
   };
   if (!isRecord(value) || value.version !== 1 || value.host !== target.host || value.file !== target.file
     || value.name !== target.name || !isDigest(value.intent) || !isConfigImage(value.before) || !isConfigImage(value.after)) return refuse();

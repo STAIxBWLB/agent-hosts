@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
+import { EntryRefusal } from "./refusal.ts";
 
 export const SETUP_CONFIG_BYTES = 8 * 1024 * 1024;
 const MAX_NODES = 65536, MAX_DEPTH = 32;
@@ -6,14 +7,17 @@ const temporal = new Set(["[object Temporal.Instant]", "[object Temporal.PlainDa
 const plain = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value));
 const prefix = (left: readonly string[], right: readonly string[]) => left.length <= right.length && left.every((key, index) => key === right[index]);
 const error = (): never => { throw Error("setup TOML unavailable or unsupported; no configuration changed"); };
+const size = (): never => {
+  throw new EntryRefusal("size-limit", "setup TOML exceeds 8 MiB; reduce the file size before retrying; no configuration changed");
+};
 function parse(text: string): Record<string, unknown> {
-  if (Buffer.byteLength(text) > SETUP_CONFIG_BYTES) return error();
+  if (Buffer.byteLength(text) > SETUP_CONFIG_BYTES) return size();
   try { const value: unknown = Bun.TOML.parse(text); return plain(value) ? value : error(); } catch { return error(); }
 }
 /** Compare Temporal values and nonfinite numbers explicitly rather than relying on enumerable object properties. */
 function shape(value: unknown, depth = 0, count = { value: 0, bytes: 0 }, seen = new Set<object>()): unknown {
   if (depth > MAX_DEPTH || ++count.value > MAX_NODES) return error();
-  if (typeof value === "string") { count.bytes += Buffer.byteLength(value); if (count.bytes > SETUP_CONFIG_BYTES) return error(); return ["string", value]; }
+  if (typeof value === "string") { count.bytes += Buffer.byteLength(value); if (count.bytes > SETUP_CONFIG_BYTES) return size(); return ["string", value]; }
   if (typeof value === "boolean") return ["boolean", value];
   if (typeof value === "number") return ["number", Number.isNaN(value) ? "nan" : Object.is(value, -0) ? "-0" : String(value)];
   if (!value || typeof value !== "object" || seen.has(value)) return error();
@@ -25,7 +29,7 @@ function shape(value: unknown, depth = 0, count = { value: 0, bytes: 0 }, seen =
   try {
     if (Array.isArray(value)) return ["array", Array.from({ length: value.length }, (_, index) => shape(value[index], depth + 1, count, seen))];
     return ["table", Object.keys(value).sort().map(key => {
-      count.bytes += Buffer.byteLength(key); if (count.bytes > SETUP_CONFIG_BYTES) return error();
+      count.bytes += Buffer.byteLength(key); if (count.bytes > SETUP_CONFIG_BYTES) return size();
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor || !("value" in descriptor)) return error();
       return [key, shape(descriptor.value, depth + 1, count, seen)];

@@ -86,28 +86,27 @@ for (const consumer of consumers) {
         mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
         writeFileSync(file, image.text, { mode: image.mode });
       }
-      const cwd = process.cwd();
-      let paths: ReturnType<typeof resolveHostPaths>;
-      try {
-        process.chdir(home);
-        paths = resolveHostPaths({ env: item.env, home, hosts: [host], redirectManagedProfiles: memory });
-      } finally {
-        process.chdir(cwd);
-      }
-      const file = paths.paths[host]![0]!;
+      const paths = resolveHostPaths({ env: item.env, home, hosts: [host], redirectManagedProfiles: memory });
       const target = { host, paths, name, receiptDir: join(home, "package-receipts") };
       const preview = planEntry({ ...target, entry });
-      const emptyHome = item.id === "jcode-empty-home";
       const tildeHome = item.id === "qwen-tilde-home";
 
       expect(snapshot(files)).toEqual(item.before);
-      if (emptyHome) {
+      if (item.id === "jcode-empty-home") {
         expect(item.plan.files).toEqual([join(home, ".jcode/mcp.json")]);
-        expect(item.afterApply[file]).toBeNull();
-        expect(file).toBe(join(home, "mcp.json"));
-      } else {
-        expect(file).toBe(item.file);
+        expect(item.afterApply[item.file]).not.toBeNull();
+        expect(item.afterUndo).toEqual(item.before);
+        expect(paths.paths.jcode).toBeUndefined();
+        expect(preview).toEqual({
+          change: "refused", code: "empty-override",
+          reason: "JCODE_HOME is set but empty; unset it or supply an absolute directory",
+        });
+        expect(() => applyEntry(preview, target)).toThrow("JCODE_HOME is set but empty");
+        expect(snapshot(files)).toEqual(item.before);
+        return;
       }
+      const file = paths.paths[host]![0]!;
+      expect(file).toBe(item.file);
       if (tildeHome) {
         expect(item.plan).toMatchObject({ change: "refused" });
         expect(item.plan.reason).toContain("QWEN_HOME");
@@ -154,7 +153,6 @@ for (const consumer of consumers) {
         if (!memory || memoryFormatting.has(host)) expect(installed.text).not.toBe(legacy.text);
         else expect(installed).toEqual(legacy);
       }
-      if (emptyHome) expect(applied[item.file]).toBeNull();
       for (const other of files.filter((path) => path !== file)) {
         expect(applied[other]).toEqual(item.before[other]);
         if (other !== item.file && memory && memoryHookFiles.has(host)) expect(item.afterApply[other]).not.toBeNull();
