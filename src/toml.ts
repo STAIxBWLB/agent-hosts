@@ -130,10 +130,15 @@ function replace(text: string, changes: Replacement[]): string {
  * ponytail: <=8 MiB, depth32 and string table paths only. Array-element editing requires a richer host API;
  * unsupported layouts/values refuse after Bun parse/semantic verification, never fall back to rewriting the document.
  */
-export function setTomlPath(text: string, path: readonly string[], value: unknown | undefined): string {
-  return editTomlPath(text, path, value);
+export function setTomlPath(
+  text: string,
+  path: readonly string[],
+  value: unknown | undefined,
+  options?: { refuseInlineParent?: boolean },
+): string {
+  return editTomlPath(text, path, value, undefined, options?.refuseInlineParent);
 }
-function editTomlPath(text: string, path: readonly string[], value: unknown | undefined, eol = text.includes("\r\n") ? "\r\n" : "\n"): string {
+function editTomlPath(text: string, path: readonly string[], value: unknown | undefined, eol = text.includes("\r\n") ? "\r\n" : "\n", refuseInlineParent = false): string {
   if (!path.length || path.length > 8 || path.some(key => typeof key !== "string" || Buffer.byteLength(key) > 256 || /[\p{Cc}\p{Cf}]/u.test(key))) return error();
   const original = parse(text), current = at(original, path);
   shape(original);
@@ -149,6 +154,9 @@ function editTomlPath(text: string, path: readonly string[], value: unknown | un
   const units = statements(text), ancestor = units.find(unit => !unit.header && prefix(unit.path, path));
   let output: string;
   if (ancestor) {
+    if (refuseInlineParent && ancestor.path.length < path.length) {
+      throw new Error("cannot edit one entry without rewriting its inline parent; convert the parent to standard TOML tables");
+    }
     const replacement = at(expected, ancestor.path);
     const suffix = ancestor.comment !== undefined ? " " + text.slice(ancestor.comment, ancestor.end) : /\r?\n$/.exec(text.slice(ancestor.start, ancestor.end))?.[0] ?? "";
     output = replace(text, [{ start: ancestor.start, end: ancestor.end, text: replacement === undefined ? "" : `${text.slice(ancestor.start, ancestor.equal! + 1)} ${inline(replacement)}${suffix}` }]);
