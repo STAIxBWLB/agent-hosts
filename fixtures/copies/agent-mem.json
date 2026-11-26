@@ -1,0 +1,585 @@
+{
+  "copy": "agent-mem",
+  "commit": "e37eb63d8be0e681aafb96d290023009d78e53ff",
+  "cases": [
+    {
+      "id": "claude-standard",
+      "host": "claude",
+      "name": "amem",
+      "key": "mcpServers",
+      "file": "$FIXTURE/.claude/.claude.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "add",
+        "files": [
+          "$FIXTURE/.claude/.claude.json",
+          "$FIXTURE/.claude/settings.json"
+        ],
+        "registration": [
+          "claude",
+          "mcp",
+          "add",
+          "--scope",
+          "user",
+          "--transport",
+          "stdio",
+          "amem",
+          "--",
+          "$FIXTURE/bin/bun",
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.claude/.claude.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.claude/settings.json": null
+      },
+      "afterApply": {
+        "$FIXTURE/.claude/.claude.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"amem\": {\n      \"type\": \"stdio\",\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"--smol\",\n        \"$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js\",\n        \"mcp\"\n      ],\n      \"env\": {}\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.claude/settings.json": {
+          "text": "{\n  \"hooks\": {\n    \"SessionStart\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' hook SessionStart\",\n            \"timeout\": 1\n          }\n        ]\n      }\n    ],\n    \"UserPromptSubmit\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' hook UserPromptSubmit\",\n            \"timeout\": 1\n          }\n        ]\n      }\n    ],\n    \"PreToolUse\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' hook PreToolUse\",\n            \"timeout\": 1\n          }\n        ]\n      }\n    ],\n    \"PostToolUse\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' hook PostToolUse\",\n            \"timeout\": 1\n          }\n        ]\n      }\n    ],\n    \"PostToolUseFailure\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' hook PostToolUseFailure\",\n            \"timeout\": 1\n          }\n        ]\n      }\n    ],\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' hook Stop\",\n            \"timeout\": 1\n          }\n        ]\n      }\n    ],\n    \"SessionEnd\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' hook SessionEnd\",\n            \"timeout\": 1\n          }\n        ]\n      }\n    ]\n  }\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.claude/.claude.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.claude/settings.json": null
+      },
+      "entry": {
+        "type": "stdio",
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ],
+        "env": {}
+      }
+    },
+    {
+      "id": "codex-standard",
+      "host": "codex",
+      "name": "amem",
+      "key": "mcp_servers",
+      "file": "$FIXTURE/.codex/config.toml",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "replace",
+        "files": [
+          "$FIXTURE/.codex/config.toml",
+          "$FIXTURE/.codex/hooks.json"
+        ],
+        "registration": [
+          "codex",
+          "mcp",
+          "add",
+          "amem",
+          "--",
+          "$FIXTURE/bin/bun",
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.codex/config.toml": {
+          "text": "fixture = true\n\n[mcp_servers.other]\ncommand = \"/fixture/keep\"\n\n[mcp_servers.amem]\ncommand = \"/fixture/previous\"\nargs = [\"old\"]\n",
+          "mode": 384
+        },
+        "$FIXTURE/.codex/hooks.json": null
+      },
+      "afterApply": {
+        "$FIXTURE/.codex/config.toml": {
+          "text": "fixture = true\n\n\"mcp_servers\".\"amem\" = { \"command\" = \"$FIXTURE/bin/bun\", \"args\" = [\"--smol\", \"$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js\", \"mcp\"] }\n[mcp_servers.other]\ncommand = \"/fixture/keep\"\n\n",
+          "mode": 384
+        },
+        "$FIXTURE/.codex/hooks.json": {
+          "text": "{\n  \"hooks\": {\n    \"SessionEnd\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' ingest codex --json\",\n            \"timeout\": 3\n          }\n        ]\n      }\n    ]\n  }\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.codex/config.toml": {
+          "text": "fixture = true\n\n[mcp_servers.other]\ncommand = \"/fixture/keep\"\n\n[mcp_servers.amem]\ncommand = \"/fixture/previous\"\nargs = [\"old\"]\n",
+          "mode": 384
+        },
+        "$FIXTURE/.codex/hooks.json": null
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ]
+      }
+    },
+    {
+      "id": "kimi-standard",
+      "host": "kimi",
+      "name": "amem",
+      "key": "mcpServers",
+      "file": "$FIXTURE/.kimi-code/mcp.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "replace",
+        "files": [
+          "$FIXTURE/.kimi-code/mcp.json",
+          "$FIXTURE/.kimi-code/config.toml"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.kimi-code/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"amem\": {\n      \"command\": \"/fixture/previous\",\n      \"args\": [\n        \"old\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.kimi-code/config.toml": null
+      },
+      "afterApply": {
+        "$FIXTURE/.kimi-code/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"amem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"--smol\",\n        \"$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js\",\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.kimi-code/config.toml": {
+          "text": "\"hooks\" = [ { \"event\" = \"SessionEnd\", \"command\" = \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' ingest kimi --json\", \"timeout\" = 3 }]\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.kimi-code/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"amem\": {\n      \"command\": \"/fixture/previous\",\n      \"args\": [\n        \"old\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.kimi-code/config.toml": null
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ]
+      }
+    },
+    {
+      "id": "pi-standard",
+      "host": "pi",
+      "name": "amem",
+      "key": "mcpServers",
+      "file": "$FIXTURE/.pi/agent/mcp.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "add",
+        "files": [
+          "$FIXTURE/.pi/agent/mcp.json",
+          "$FIXTURE/.pi/agent/extensions/amem-session.ts"
+        ],
+        "registration": [
+          "pi",
+          "mcp",
+          "add",
+          "amem",
+          "--",
+          "$FIXTURE/bin/bun",
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.pi/agent/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.pi/agent/extensions/amem-session.ts": null
+      },
+      "afterApply": {
+        "$FIXTURE/.pi/agent/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"amem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"--smol\",\n        \"$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js\",\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.pi/agent/extensions/amem-session.ts": {
+          "text": "// amem setup managed session-end ingest; no resident worker or instruction injection.\nimport { spawnSync } from 'node:child_process';\nexport default function (pi) {\n  pi.on('session_shutdown', (_event, ctx) => {\n    try { spawnSync(\"$FIXTURE/bin/bun\", ['--smol', \"$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js\", 'ingest', 'pi'], { cwd: ctx.cwd, stdio: 'ignore', timeout: 2500 }); } catch {}\n  });\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.pi/agent/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.pi/agent/extensions/amem-session.ts": null
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ]
+      }
+    },
+    {
+      "id": "qwen-standard",
+      "host": "qwen",
+      "name": "amem",
+      "key": "mcpServers",
+      "file": "$FIXTURE/.qwen/settings.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "add",
+        "files": [
+          "$FIXTURE/.qwen/settings.json"
+        ],
+        "registration": [
+          "qwen",
+          "mcp",
+          "add",
+          "--scope",
+          "user",
+          "--transport",
+          "stdio",
+          "amem",
+          "$FIXTURE/bin/bun",
+          "--",
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.qwen/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterApply": {
+        "$FIXTURE/.qwen/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"amem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"--smol\",\n        \"$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js\",\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true,\n  \"hooks\": {\n    \"SessionEnd\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' ingest qwen --json\",\n            \"timeout\": 3\n          }\n        ]\n      }\n    ]\n  }\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.qwen/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ]
+      }
+    },
+    {
+      "id": "jcode-standard",
+      "host": "jcode",
+      "name": "amem",
+      "key": "servers",
+      "file": "$FIXTURE/.jcode/mcp.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "replace",
+        "files": [
+          "$FIXTURE/.jcode/mcp.json",
+          "$FIXTURE/.jcode/config.toml"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.jcode/mcp.json": {
+          "text": "{\n  \"servers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"amem\": {\n      \"command\": \"/fixture/previous\",\n      \"args\": [\n        \"old\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.jcode/config.toml": null
+      },
+      "afterApply": {
+        "$FIXTURE/.jcode/mcp.json": {
+          "text": "{\n  \"servers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"amem\": {\"command\":\"$FIXTURE/bin/bun\",\"args\":[\"--smol\",\"$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js\",\"mcp\"],\"shared\":false}\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.jcode/config.toml": {
+          "text": "\"hooks\".\"post_tool\" = \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' hook jcode\"\n\"hooks\".\"turn_end\" = \"'$FIXTURE/bin/bun' --smol '$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js' hook jcode\"\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.jcode/mcp.json": {
+          "text": "{\n  \"servers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"amem\": {\n      \"command\": \"/fixture/previous\",\n      \"args\": [\n        \"old\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/.jcode/config.toml": null
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ],
+        "shared": false
+      }
+    },
+    {
+      "id": "opencode-standard",
+      "host": "opencode",
+      "name": "amem",
+      "key": "mcp",
+      "file": "$FIXTURE/.config/opencode/opencode.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "add",
+        "files": [
+          "$FIXTURE/.config/opencode/opencode.json"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.config/opencode/opencode.json": {
+          "text": "{\n  \"mcp\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterApply": {
+        "$FIXTURE/.config/opencode/opencode.json": {
+          "text": "{\n  \"mcp\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\"amem\":{\"type\":\"local\",\"command\":[\"$FIXTURE/bin/bun\",\"--smol\",\"$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js\",\"mcp\"],\"enabled\":true}\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.config/opencode/opencode.json": {
+          "text": "{\n  \"mcp\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "entry": {
+        "type": "local",
+        "command": [
+          "$FIXTURE/bin/bun",
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ],
+        "enabled": true
+      }
+    },
+    {
+      "id": "gemini-standard",
+      "host": "gemini",
+      "name": "amem",
+      "key": "mcpServers",
+      "file": "$FIXTURE/.gemini/settings.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "add",
+        "files": [
+          "$FIXTURE/.gemini/settings.json"
+        ],
+        "registration": [
+          "gemini",
+          "mcp",
+          "add",
+          "--scope",
+          "user",
+          "--transport",
+          "stdio",
+          "amem",
+          "$FIXTURE/bin/bun",
+          "--",
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.gemini/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterApply": {
+        "$FIXTURE/.gemini/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"amem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"--smol\",\n        \"$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js\",\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.gemini/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "--smol",
+          "$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js",
+          "mcp"
+        ]
+      }
+    }
+  ]
+}
