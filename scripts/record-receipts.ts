@@ -1,62 +1,18 @@
 // Run manually on macOS with the three consumer checkouts and their installed dependencies.
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { captureConsumerCopies, type ConsumerCopy } from "./fixture-capture.ts";
 
-const checkouts = process.argv[2];
-if (process.platform !== "darwin" || !checkouts) {
-  throw new Error("Run on macOS: bun scripts/record-receipts.ts /path/to/consumer-checkouts");
-}
-
-const consumers = { "vault-mem": "9b9a4a5", "agent-research": "05699c2", "agent-mem": "e37eb63" };
-const temp = mkdtempSync(join(realpathSync(tmpdir()), "agent-hosts-record-"));
-const sandbox = `(version 1) (allow default) (deny network*) (deny file-write*) (allow file-write* (literal "/dev/null") (subpath ${JSON.stringify(temp)}))`;
-
-try {
-  // Seatbelt blocks macOS's setuid ps. Supply a deterministic identity for the
-  // single scratch writer; agent-mem uses it only for its transient setup lock.
-  const system = join(temp, "system");
-  mkdirSync(system);
-  writeFileSync(join(system, "ps"), '#!/bin/sh\n[ "$1" = -p ] || exit 1\nprintf "fixture setup writer %s\\n" "$2"\n', { mode: 0o700 });
-  for (const [consumer, revision] of Object.entries(consumers)) {
-    const checkout = resolve(checkouts, consumer);
-    const source = join(temp, consumer);
-    mkdirSync(source);
-    const git = (args: string[]) => execFileSync("git", ["-C", checkout, ...args], { maxBuffer: 32 * 1024 * 1024 });
-    const commit = git(["rev-parse", revision]).toString().trim();
-    const directories = git(["ls-tree", "--name-only", commit]).toString().trim().split("\n");
-    const archived = ["src", "package.json", "bin", "skills"].filter((name) => directories.includes(name));
-    execFileSync("tar", ["-xf", "-", "-C", source], { input: git(["archive", commit, ...archived]) });
-    const manifest = JSON.parse(readFileSync(join(source, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
-    for (const [name, version] of Object.entries(manifest.dependencies ?? {})) {
-      const installed = Object.keys(consumers).map((repo) => resolve(checkouts, repo, "node_modules", name))
-        .find((candidate) => {
-          const pkg = join(candidate, "package.json");
-          return existsSync(pkg) && Bun.semver.satisfies(JSON.parse(readFileSync(pkg, "utf8")).version, version);
-        });
-      if (!installed) throw new Error(`${consumer}: no local dependency ${name}@${version}; provide it in a consumer checkout`);
-      mkdirSync(join(source, "node_modules", name, ".."), { recursive: true });
-      symlinkSync(installed, join(source, "node_modules", name), "dir");
-    }
-    const script = join(source, "record.ts");
-    writeFileSync(script, recorder(consumer));
-    for (const version of consumer === "agent-mem" ? [1, 2] : [1]) {
-      const home = join(temp, `${consumer}-v${version}`);
-      mkdirSync(home, { mode: 0o700 });
-      const output = execFileSync("/usr/bin/sandbox-exec", ["-p", sandbox, process.execPath, script, home, String(version), commit], {
-        cwd: home, env: { HOME: home, PATH: `${system}:/usr/bin:/bin`, TMPDIR: home }, encoding: "utf8", timeout: 30_000,
-      });
-      const fixtureDir = join(import.meta.dir, "../fixtures/receipts", consumer);
-      mkdirSync(fixtureDir, { recursive: true });
-      writeFileSync(join(fixtureDir, `v${version}.json`), output);
-    }
+captureConsumerCopies(process.argv[2], (consumer, commit, run) => {
+  for (const version of consumer === "agent-mem" ? [1, 2] : [1]) {
+    const output = run(recorder(consumer), `v${version}`, [String(version), commit]);
+    const fixtureDir = join(import.meta.dir, "../fixtures/receipts", consumer);
+    mkdirSync(fixtureDir, { recursive: true });
+    writeFileSync(join(fixtureDir, `v${version}.json`), output);
   }
-} finally {
-  rmSync(temp, { recursive: true, force: true });
-}
+});
 
-function recorder(consumer: string): string {
+function recorder(consumer: ConsumerCopy): string {
   return `
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -79,7 +35,7 @@ const put = (path, text, mode = 0o600) => {
 };
 put(runtime, "#!/bin/sh\\nexit 1\\n", 0o700);
 put(join(bin, "kimi"), "#!/bin/sh\\necho 0.0.0-fixture\\n", 0o700);
-const host = "kimi", name = ${JSON.stringify({ "vault-mem": "vmem", "agent-research": "ares", "agent-mem": "amem" }[consumer as keyof typeof consumers])};
+const host = "kimi", name = ${JSON.stringify({ "vault-mem": "vmem", "agent-research": "ares", "agent-mem": "amem" }[consumer])};
 const file = join(env.KIMI_CODE_HOME, "mcp.json");
 const prior = { command: "/fixture/prior", args: ["mcp"] };
 const before = '{\\n  "mcpServers": {\\n    "other": {\\n      "command": "keep"\\n    },\\n    "' + name + '": '

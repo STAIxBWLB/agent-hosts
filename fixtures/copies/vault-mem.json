@@ -1,0 +1,457 @@
+{
+  "copy": "vault-mem",
+  "commit": "9b9a4a5333aaa73453858a541b82028c63f8f7f8",
+  "cases": [
+    {
+      "id": "claude-standard",
+      "host": "claude",
+      "name": "vmem",
+      "key": "mcpServers",
+      "file": "$FIXTURE/.claude/.claude.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "add",
+        "files": [
+          "$FIXTURE/.claude/.claude.json"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.claude/.claude.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterApply": {
+        "$FIXTURE/.claude/.claude.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"vmem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.claude/.claude.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "mcp"
+        ]
+      }
+    },
+    {
+      "id": "codex-standard",
+      "host": "codex",
+      "name": "vmem",
+      "key": "mcp_servers",
+      "file": "$FIXTURE/.codex/config.toml",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "replace",
+        "files": [
+          "$FIXTURE/.codex/config.toml"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.codex/config.toml": {
+          "text": "fixture = true\n\n[mcp_servers.other]\ncommand = \"/fixture/keep\"\n\n[mcp_servers.vmem]\ncommand = \"/fixture/previous\"\nargs = [\"old\"]\n",
+          "mode": 384
+        }
+      },
+      "afterApply": {
+        "$FIXTURE/.codex/config.toml": {
+          "text": "fixture = true\n\n[mcp_servers.other]\ncommand = \"/fixture/keep\"\n\n[mcp_servers.vmem]\ncommand = \"$FIXTURE/bin/bun\"\nargs = [\"mcp\"]\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.codex/config.toml": {
+          "text": "fixture = true\n\n[mcp_servers.other]\ncommand = \"/fixture/keep\"\n\n[mcp_servers.vmem]\ncommand = \"/fixture/previous\"\nargs = [\"old\"]\n",
+          "mode": 384
+        }
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "mcp"
+        ]
+      }
+    },
+    {
+      "id": "kimi-standard",
+      "host": "kimi",
+      "name": "vmem",
+      "key": "mcpServers",
+      "file": "$FIXTURE/.kimi-code/mcp.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "replace",
+        "files": [
+          "$FIXTURE/.kimi-code/mcp.json"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.kimi-code/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"vmem\": {\n      \"command\": \"/fixture/previous\",\n      \"args\": [\n        \"old\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterApply": {
+        "$FIXTURE/.kimi-code/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"vmem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.kimi-code/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"vmem\": {\n      \"command\": \"/fixture/previous\",\n      \"args\": [\n        \"old\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "mcp"
+        ]
+      }
+    },
+    {
+      "id": "pi-standard",
+      "host": "pi",
+      "name": "vmem",
+      "key": "mcpServers",
+      "file": "$FIXTURE/.pi/agent/mcp.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "add",
+        "files": [
+          "$FIXTURE/.pi/agent/mcp.json"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.pi/agent/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterApply": {
+        "$FIXTURE/.pi/agent/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"vmem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.pi/agent/mcp.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "mcp"
+        ]
+      }
+    },
+    {
+      "id": "qwen-standard",
+      "host": "qwen",
+      "name": "vmem",
+      "key": "mcpServers",
+      "file": "$FIXTURE/.qwen/settings.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "add",
+        "files": [
+          "$FIXTURE/.qwen/settings.json"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.qwen/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterApply": {
+        "$FIXTURE/.qwen/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"vmem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.qwen/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "mcp"
+        ]
+      }
+    },
+    {
+      "id": "jcode-standard",
+      "host": "jcode",
+      "name": "vmem",
+      "key": "servers",
+      "file": "$FIXTURE/.jcode/mcp.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "replace",
+        "files": [
+          "$FIXTURE/.jcode/mcp.json"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.jcode/mcp.json": {
+          "text": "{\n  \"servers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"vmem\": {\n      \"command\": \"/fixture/previous\",\n      \"args\": [\n        \"old\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterApply": {
+        "$FIXTURE/.jcode/mcp.json": {
+          "text": "{\n  \"servers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"vmem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/.jcode/mcp.json": {
+          "text": "{\n  \"servers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"vmem\": {\n      \"command\": \"/fixture/previous\",\n      \"args\": [\n        \"old\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "mcp"
+        ]
+      }
+    },
+    {
+      "id": "qwen-tilde-home",
+      "host": "qwen",
+      "name": "vmem",
+      "key": "mcpServers",
+      "file": "$FIXTURE/custom-qwen/settings.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "~/custom-qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "refused",
+        "reason": "setup: QWEN_HOME must be absolute"
+      },
+      "before": {
+        "$FIXTURE/custom-qwen/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterApply": {
+        "$FIXTURE/custom-qwen/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/custom-qwen/settings.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "mcp"
+        ]
+      }
+    },
+    {
+      "id": "jcode-empty-home",
+      "host": "jcode",
+      "name": "vmem",
+      "key": "servers",
+      "file": "$FIXTURE/.jcode/mcp.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "plan": {
+        "change": "add",
+        "files": [
+          "$FIXTURE/.jcode/mcp.json"
+        ]
+      },
+      "before": {
+        "$FIXTURE/.jcode/mcp.json": null,
+        "$FIXTURE/mcp.json": null
+      },
+      "afterApply": {
+        "$FIXTURE/.jcode/mcp.json": {
+          "text": "{\n  \"servers\": {\n    \"vmem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"mcp\"\n      ]\n    }\n  }\n}\n",
+          "mode": 384
+        },
+        "$FIXTURE/mcp.json": null
+      },
+      "afterUndo": {
+        "$FIXTURE/.jcode/mcp.json": null,
+        "$FIXTURE/mcp.json": null
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "mcp"
+        ]
+      }
+    }
+  ]
+}
