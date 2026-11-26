@@ -219,3 +219,23 @@ test("Jcode legacy undo leaves a sibling alias intact and restores only the cano
   expect(undoEntry({ host, paths, name, receiptDir }).change).toBe("restored");
   expect(readFileSync(file, "utf8")).toBe(installed.replace('"installed"', '"prior"').slice(0, -1) + "," + alias + "}");
 });
+
+for (const [consumer, version] of [
+  ["vault-mem", 1], ["agent-research", 1], ["agent-mem", 1], ["agent-mem", 2],
+] as const) {
+  test.each(["absent", "restored"] as const)(
+    `${consumer} v${version} supersedes a retained legacy receipt whose entry is already %s`,
+    (state) => {
+      const { file, receiptFile, before, target } = replay(consumer, version);
+      const current = state === "restored" ? before : '{"unrelated":true}';
+      put(file, current);
+      const plan = planEntry({ ...target, entry: { command: "new", args: ["mcp"] } });
+      expect(plan.change).toBe(state === "restored" ? "replace" : "add");
+      const applied = applyEntry(plan, { receiptDir: target.receiptDir });
+      expect(applied).toMatchObject({ legacy: true, supersedes: receiptFile });
+      expect(readEntryReceipt(target)?.before).toEqual(asImage(current));
+      expect(undoEntry(target).change).toBe(state === "restored" ? "restored" : "removed");
+      expect(readFileSync(file, "utf8")).toBe(current);
+    },
+  );
+}

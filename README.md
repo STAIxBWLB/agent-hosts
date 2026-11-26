@@ -60,7 +60,7 @@ OpenCode preview and apply refuse nonblank `OPENCODE_CONFIG`, `OPENCODE_CONFIG_D
 
 Writes use bounded reads, refuse linked paths, and publish through a temporary file while preserving the config's mode. Configuration is capped at 8 MiB. The `<config>.agent-hosts.lock` file serializes package writers. Take any consumer-specific lock around package calls. If a stale lock blocks an operation, confirm that its writer has stopped before removing the named lock.
 
-Package receipts use `entry-<digest([file, name])>.json` and carry version 1. Apply and undo return the receipt intent when one is known. Retry the same plan after interrupted publication. Undo can cancel a pending apply while the config still matches its start image. After publication, finish the apply before undoing.
+Package receipts use `entry-<digest([file, name])>.json` and carry version 1. A pending replacement can temporarily store its previous receipt at `<receipt>.previous-<digest>`. Consumers scanning the receipt directory should ignore these recovery files. Apply and undo return the receipt intent when one is known. Retry the same plan after interrupted publication. Undo can cancel a pending apply while the config still matches its start image. After publication, finish the apply before undoing.
 
 ### Use the codecs directly
 

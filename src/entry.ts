@@ -365,15 +365,18 @@ function legacyPrior(legacy: Extract<LegacyReceipt, { kind: "entry" }>, codec: R
 function legacyBaseline(selection: ReceiptTarget, legacy: LegacyReceipt, current: ConfigImage): ConfigImage {
   return editConfig(selection.file, () => {
     const codec = configCodec(selection, true);
+    const live = codec.read(current);
     if (legacy.kind === "agent-mem") {
       const installed = codec.read(legacy.after);
       if (!record(installed)) throw new EntryRefusal("invalid-receipt", "legacy receipt has no installed MCP entry");
-      assertInstalled(codec.read(current), installed);
+      if (live === undefined || isDeepStrictEqual(live, codec.read(legacy.before))) return current;
+      assertInstalled(live, installed);
       const restored = codec.restore(legacy.before, legacy.after, current, { ownedOnly: true });
       return { bytes: restored.bytes, mode: current.mode };
     }
-    assertInstalled(codec.read(current), legacy.installed);
     const prior = legacyPrior(legacy, codec, current.mode);
+    if (live === undefined || isDeepStrictEqual(live, prior)) return current;
+    assertInstalled(live, legacy.installed);
     const restored = codec.put(current, prior, { keepEmpty: legacy.keyExisted });
     if (!legacy.existed && restored.bytes !== null) {
       const text = decoder.decode(Buffer.from(restored.bytes, "base64"));
