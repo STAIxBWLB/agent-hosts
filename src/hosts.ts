@@ -109,6 +109,13 @@ export const HOSTS = {
     entry: stdio,
     verified: ["0.61.0"],
   },
+  agy: {
+    id: "agy",
+    files: [{ scope: "project", path: ".agents/mcp_config.json" }],
+    format: mcpServers,
+    entry: stdio,
+    verified: ["1.5.18"],
+  },
 } as const satisfies Record<string, HostDefinition>;
 
 export type HostId = keyof typeof HOSTS;

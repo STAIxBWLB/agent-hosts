@@ -20,10 +20,11 @@ bun add --exact @staix/agent-hosts@0.1.0
 | `jcode` | user `~/.jcode/mcp.json` | JSON `servers` (alias `mcpServers`) | `0.99.1` |
 | `opencode` | user `~/.config/opencode/opencode.json` | JSON `mcp` | `1.18.35` |
 | `gemini` | user `~/.gemini/settings.json` | JSON `mcpServers` | `0.61.0` |
+| `agy` | project `.agents/mcp_config.json` | JSON `mcpServers` | `1.5.18` |
 
 `HOSTS` records the file scopes, environment overrides, format, entry fields, and verified versions. `HostDefinition.entry` lists the minimum fields read by the host. Extra fields, including `env`, pass through. `CLAUDE_CONFIG_DIR` moves the Claude file into that directory as `.claude.json`. `QWEN_HOME` expands `~` against the injected home. A set but empty `JCODE_HOME` is refused. OpenCode and Gemini honor absolute `XDG_CONFIG_HOME` and `GEMINI_CLI_HOME` respectively, with an empty value treated as unset. [Version evidence](https://github.com/STAIxBWLB/agent-hosts/pull/5)
 
-The direct workspace Antigravity (`agy`) configuration remains with each consumer for 0.1.0. See the [spec ruling](https://github.com/STAIxBWLB/agent-hosts/issues/1#antigravity-agy-is-not-in-010) and [fixture divergences](fixtures/DIVERGENCES.md).
+Antigravity support is scheduled for the next minor after 0.1.0. The verified host loads the direct workspace file at runtime. On the verified version, `agy mcp list` listed the user-scope control and omitted both project files. Pass `scopes: ["project"]` and `workspaceRoot` to resolve the project file. [Verification receipt](https://github.com/STAIxBWLB/agent-hosts/blob/main/docs/verification/2026-11-27-agy-1.5.18.md)
 
 ## API
 

@@ -2,9 +2,6 @@
 
 | Copy | Case | Consumer result | Package result | Reason |
 | --- | --- | --- | --- | --- |
-| vault-mem | Antigravity (`agy`) | Writes and undoes the project MCP entry | Excluded from 0.1.0 | Project MCP shape lacks exact-version evidence, per #1 |
-| agent-research | Antigravity (`agy`) | Writes and undoes the project MCP entry | Excluded from 0.1.0 | Project MCP shape lacks exact-version evidence, per #1 |
-| agent-mem | Antigravity (`agy`) | Writes and undoes the project MCP entry | Excluded from 0.1.0 | Project MCP shape lacks exact-version evidence, per #1 |
 | vault-mem | Legacy receipt undo | Deletes the consumed v1 receipt | Retains the legacy file | Legacy receipts remain with the consumer |
 | agent-research | Legacy receipt undo | Deletes the consumed v1 receipt | Retains the legacy file | Legacy receipts remain with the consumer |
 | agent-mem | Legacy receipt undo | Restores MCP and hook changes, then removes the journal | Restores the MCP entry and retains the journal | The consumer owns hook state and history |
