@@ -1,1 +1,1 @@
-export {};
+export { realPath } from "./platform.ts";
