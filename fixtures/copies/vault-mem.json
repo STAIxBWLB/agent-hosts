@@ -345,6 +345,64 @@
       }
     },
     {
+      "id": "agy-standard",
+      "host": "agy",
+      "name": "vmem",
+      "key": "mcpServers",
+      "file": "$FIXTURE/workspace/.agents/mcp_config.json",
+      "env": {
+        "HOME": "$FIXTURE",
+        "PATH": "$FIXTURE/bin:/usr/bin:/bin",
+        "TMPDIR": "$FIXTURE",
+        "AMEM_HOME": "$FIXTURE/memory",
+        "VMEM_HOME": "$FIXTURE/vault",
+        "AGENTHUB_HOME": "$FIXTURE/hub",
+        "CLAUDE_CONFIG_DIR": "$FIXTURE/.claude",
+        "CODEX_HOME": "$FIXTURE/.codex",
+        "KIMI_CODE_HOME": "$FIXTURE/.kimi-code",
+        "PI_CODING_AGENT_DIR": "$FIXTURE/.pi/agent",
+        "QWEN_HOME": "$FIXTURE/.qwen",
+        "JCODE_HOME": "$FIXTURE/.jcode",
+        "XDG_CONFIG_HOME": "$FIXTURE/.config",
+        "XDG_DATA_HOME": "$FIXTURE/.local/share",
+        "XDG_CACHE_HOME": "$FIXTURE/.cache",
+        "XDG_STATE_HOME": "$FIXTURE/.local/state",
+        "GEMINI_CLI_HOME": "$FIXTURE",
+        "ORCA_USER_DATA_PATH": "$FIXTURE/orca"
+      },
+      "workspaceRoot": "$FIXTURE/workspace",
+      "plan": {
+        "change": "add",
+        "files": [
+          "$FIXTURE/workspace/.agents/mcp_config.json"
+        ]
+      },
+      "before": {
+        "$FIXTURE/workspace/.agents/mcp_config.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterApply": {
+        "$FIXTURE/workspace/.agents/mcp_config.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    },\n    \"vmem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "afterUndo": {
+        "$FIXTURE/workspace/.agents/mcp_config.json": {
+          "text": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"/fixture/keep\"\n    }\n  },\n  \"fixture\": true\n}\n",
+          "mode": 384
+        }
+      },
+      "entry": {
+        "command": "$FIXTURE/bin/bun",
+        "args": [
+          "mcp"
+        ]
+      }
+    },
+    {
       "id": "qwen-tilde-home",
       "host": "qwen",
       "name": "vmem",

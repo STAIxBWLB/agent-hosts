@@ -13,6 +13,7 @@ interface Case {
   key: string;
   env: Record<string, string>;
   file: string;
+  workspaceRoot?: string;
   entry: Record<string, unknown>;
   plan: { change: "add" | "replace" | "refused"; files?: string[]; reason?: string };
   before: Snapshot;
@@ -67,8 +68,8 @@ for (const consumer of consumers) {
   };
   const memory = consumer === "agent-mem";
   test(`${consumer} fixture covers every in-scope host and override case`, () => {
-    const expected = common.map((host) => host + "-standard");
-    expected.push(...(memory ? ["opencode-standard", "gemini-standard"] : ["qwen-tilde-home", "jcode-empty-home"]));
+    const expected = (memory ? [...common, "opencode", "gemini", "agy"] : [...common, "agy"]).map((host) => host + "-standard");
+    if (!memory) expected.push("qwen-tilde-home", "jcode-empty-home");
     expect(suite.copy).toBe(consumer);
     expect(suite.commit).toMatch(/^[a-f0-9]{40}$/);
     expect(suite.cases.map((item) => item.id)).toEqual(expected);
@@ -86,7 +87,10 @@ for (const consumer of consumers) {
         mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
         writeFileSync(file, image.text, { mode: image.mode });
       }
-      const paths = resolveHostPaths({ env: item.env, home, hosts: [host], redirectManagedProfiles: memory });
+      const paths = resolveHostPaths({
+        env: item.env, home, hosts: [host], redirectManagedProfiles: memory,
+        ...(item.workspaceRoot ? { workspaceRoot: item.workspaceRoot, scopes: ["project"] } : {}),
+      });
       const target = { host, paths, name, receiptDir: join(home, "package-receipts") };
       const preview = planEntry({ ...target, entry });
       const tildeHome = item.id === "qwen-tilde-home";

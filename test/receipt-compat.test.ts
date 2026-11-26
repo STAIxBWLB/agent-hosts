@@ -25,6 +25,7 @@ interface Fixture {
   host: HostId;
   name: string;
   file: string;
+  workspaceRoot?: string;
   receiptDir: string;
   mode: number;
   before: string;
@@ -39,14 +40,18 @@ interface Fixture {
   };
 }
 
-function replay(consumer: string, version: number) {
-  const source = join(import.meta.dir, "../fixtures/receipts", consumer, `v${version}.json`);
+function replay(consumer: string, version: number, host: "kimi" | "agy" = "kimi") {
+  const source = join(import.meta.dir, "../fixtures/receipts", consumer, `${host === "agy" ? "agy-" : ""}v${version}.json`);
   const fixture = JSON.parse(readFileSync(source, "utf8")) as Fixture;
   const home = scratch();
   const path = (text: string) => text.replaceAll("$FIXTURE", home);
   const file = path(fixture.file);
   const receiptDir = path(fixture.receiptDir);
-  const receiptFile = join(receiptDir, consumer === "agent-mem" ? `${fixture.host}.json` : legacyFilename(fixture.host, file));
+  const workspaceRoot = fixture.workspaceRoot && path(fixture.workspaceRoot);
+  const memoryFilename = workspaceRoot
+    ? `agy-${createHash("sha256").update(JSON.stringify(workspaceRoot)).digest("hex")}.json`
+    : `${fixture.host}.json`;
+  const receiptFile = join(receiptDir, consumer === "agent-mem" ? memoryFilename : legacyFilename(fixture.host, file));
   for (const change of fixture.receipt.changes ?? []) {
     for (const image of [change.before, change.after, change.start]) {
       if (image?.bytes != null) image.bytes = Buffer.from(path(Buffer.from(image.bytes, "base64").toString("utf8"))).toString("base64");
@@ -59,7 +64,11 @@ function replay(consumer: string, version: number) {
   const hookText = hook?.after.bytes == null ? undefined : Buffer.from(hook.after.bytes, "base64").toString("utf8");
   const hookFile = hook ? path(hook.path) : undefined;
   if (hookFile && hookText) put(hookFile, hookText);
-  const paths = resolveHostPaths({ env: {}, home, hosts: [fixture.host] });
+  expect(fixture.host).toBe(host);
+  const paths = resolveHostPaths({
+    env: {}, home, hosts: [host],
+    ...(workspaceRoot ? { workspaceRoot, scopes: ["project"] } : {}),
+  });
   return {
     file, receiptFile, receipt, before: path(fixture.before), target: { host: fixture.host, name: fixture.name, paths, receiptDir },
     hookFile, hookText,
@@ -74,6 +83,31 @@ test.each([
   expect(readFileSync(file, "utf8")).toBe(before);
   expect(readFileSync(receiptFile, "utf8")).toBe(receipt);
   if (hookFile && hookText) expect(readFileSync(hookFile, "utf8")).toBe(hookText);
+});
+
+test.each(["vault-mem", "agent-research", "agent-mem"] as const)(
+  "%s emitted agy receipt restores one project's MCP entry",
+  (consumer) => {
+    const { file, receiptFile, receipt, before, target } = replay(consumer, 1, "agy");
+    expect(undoEntry(target)).toMatchObject({ change: "restored", file, receipt: receiptFile, legacy: true });
+    expect(readFileSync(file, "utf8")).toBe(before);
+    expect(readFileSync(receiptFile, "utf8")).toBe(receipt);
+  },
+);
+
+test("agent-mem agy undo ignores a journal from another project", () => {
+  const { file, receiptFile, receipt, target } = replay("agent-mem", 1, "agy");
+  const home = target.paths.home;
+  const workspaceRoot = join(home, "another-workspace");
+  const paths = resolveHostPaths({ home, env: {}, hosts: ["agy"], scopes: ["project"], workspaceRoot });
+  const otherFile = join(workspaceRoot, ".agents/mcp_config.json");
+  const installed = readFileSync(file, "utf8");
+  put(otherFile, installed);
+
+  expect(undoEntry({ ...target, paths })).toMatchObject({ change: "unchanged", code: "no-receipt" });
+  expect(readFileSync(otherFile, "utf8")).toBe(installed);
+  expect(readFileSync(file, "utf8")).toBe(installed);
+  expect(readFileSync(receiptFile, "utf8")).toBe(receipt);
 });
 
 test("legacy undo refuses a changed owned entry and a foreign receipt path", () => {

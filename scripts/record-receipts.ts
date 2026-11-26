@@ -4,22 +4,25 @@ import { join } from "node:path";
 import { captureConsumerCopies, type ConsumerCopy } from "./fixture-capture.ts";
 
 captureConsumerCopies(process.argv[2], (consumer, commit, run) => {
-  for (const version of consumer === "agent-mem" ? [1, 2] : [1]) {
-    const output = run(recorder(consumer), `v${version}`, [String(version), commit]);
+  const cases = [["kimi", 1], ["agy", 1]] as const;
+  for (const [host, version] of consumer === "agent-mem" ? [...cases, ["kimi", 2] as const] : cases) {
+    const label = host === "agy" ? `agy-v${version}` : `v${version}`;
+    const output = run(recorder(consumer), label, [String(version), commit, host]);
     const fixtureDir = join(import.meta.dir, "../fixtures/receipts", consumer);
     mkdirSync(fixtureDir, { recursive: true });
-    writeFileSync(join(fixtureDir, `v${version}.json`), output);
+    writeFileSync(join(fixtureDir, `${label}.json`), output);
   }
 });
 
 function recorder(consumer: ConsumerCopy): string {
   return `
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ${consumer === "agent-mem" ? "planSetup, applySetup" : "runSetup"} } from "./src/setup.ts";
 
-const [home, version, commit] = process.argv.slice(2);
+const [home, version, commit, host] = process.argv.slice(2);
 const bin = join(home, "bin"), runtime = join(bin, "bun");
 const env = {
   HOME: home, PATH: bin, TMPDIR: home, AMEM_HOME: join(home, "memory"), VMEM_HOME: join(home, "vault"),
@@ -34,9 +37,16 @@ const put = (path, text, mode = 0o600) => {
   writeFileSync(path, text, { mode });
 };
 put(runtime, "#!/bin/sh\\nexit 1\\n", 0o700);
-put(join(bin, "kimi"), "#!/bin/sh\\necho 0.0.0-fixture\\n", 0o700);
-const host = "kimi", name = ${JSON.stringify({ "vault-mem": "vmem", "agent-research": "ares", "agent-mem": "amem" }[consumer])};
-const file = join(env.KIMI_CODE_HOME, "mcp.json");
+put(join(bin, host), "#!/bin/sh\\necho 0.0.0-fixture\\n", 0o700);
+const name = ${JSON.stringify({ "vault-mem": "vmem", "agent-research": "ares", "agent-mem": "amem" }[consumer])};
+const workspaceRoot = host === "agy" ? join(home, "workspace") : undefined;
+if (workspaceRoot) {
+  mkdirSync(workspaceRoot);
+  env.PATH += ":/usr/bin:/bin";
+  execFileSync("/usr/bin/git", ["init", "-q", workspaceRoot], { env });
+}
+const cwd = workspaceRoot ?? home;
+const file = workspaceRoot ? join(workspaceRoot, ".agents/mcp_config.json") : join(env.KIMI_CODE_HOME, "mcp.json");
 const prior = { command: "/fixture/prior", args: ["mcp"] };
 const before = '{\\n  "mcpServers": {\\n    "other": {\\n      "command": "keep"\\n    },\\n    "' + name + '": '
   + JSON.stringify(prior) + '\\n  },\\n  "fixture": true\\n}\\n';
@@ -44,14 +54,14 @@ put(file, before);
 const hash = createHash("sha256").update(file).digest("hex").slice(0, 16);
 let receiptPath;
 ${consumer === "vault-mem" ? `
-const report = runSetup(host, "apply", { home: env.VMEM_HOME, env, cwd: home, entry: { command: runtime, args: ["mcp"] } });
+const report = runSetup(host, "apply", { home: env.VMEM_HOME, env, cwd, entry: { command: runtime, args: ["mcp"] } });
 if (report.actions[0]?.change !== "replace") throw new Error(JSON.stringify(report));
 receiptPath = join(env.VMEM_HOME, "setup", host + "-" + hash + ".json");
 ` : consumer === "agent-research" ? `
 const root = join(home, "release");
 put(join(root, "package.json"), readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 put(join(root, "bin/ares.js"), "// runtime is never launched\\n");
-const report = runSetup(host, "apply", { env, cwd: home, root });
+const report = runSetup(host, "apply", { env, cwd, root });
 if (report.actions[0]?.change !== "replace") throw new Error(JSON.stringify(report));
 receiptPath = report.actions[0].receipt;
 ` : `
@@ -63,7 +73,7 @@ if (version === "2") {
   const command = "'" + runtime + "' --smol '" + stale + "' ingest kimi --json";
   put(join(env.KIMI_CODE_HOME, "config.toml"), '[[' + 'hooks]]\\nevent = "SessionEnd"\\ncommand = ' + JSON.stringify(command) + '\\ntimeout = 3\\n');
 }
-const options = { env, cwd: home, bun: runtime, root, native: () => { throw new Error("unexpected native registration"); } };
+const options = { env, cwd, bun: runtime, root, native: () => { throw new Error("unexpected native registration"); } };
 const plan = planSetup(host, "apply", options);
 const report = applySetup(plan, options);
 if (report.applied[0] !== host) throw new Error(JSON.stringify(report));
@@ -81,7 +91,7 @@ if (receipt.changes) {
 }
 const after = readFileSync(file, "utf8");
 console.log(JSON.stringify({
-  commit, host, name, file: normalize(file), receiptDir: normalize(dirname(receiptPath)),
+  commit, host, name, file: normalize(file), ...(workspaceRoot ? { workspaceRoot: normalize(workspaceRoot) } : {}), receiptDir: normalize(dirname(receiptPath)),
   mode: statSync(file).mode & 0o777, before: normalize(before), after: normalize(after),
   receipt: JSON.parse(normalize(JSON.stringify(receipt))),
 }, null, 2));
