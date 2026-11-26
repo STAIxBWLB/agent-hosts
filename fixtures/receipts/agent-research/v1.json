@@ -1,0 +1,32 @@
+{
+  "commit": "05699c24953a0cd5a37721fc8255703d20a9b295",
+  "host": "kimi",
+  "name": "ares",
+  "file": "$FIXTURE/.kimi-code/mcp.json",
+  "receiptDir": "$FIXTURE/hub/research/setup",
+  "mode": 384,
+  "before": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"keep\"\n    },\n    \"ares\": {\"command\":\"/fixture/prior\",\"args\":[\"mcp\"]}\n  },\n  \"fixture\": true\n}\n",
+  "after": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"keep\"\n    },\n    \"ares\": {\n      \"command\": \"bun\",\n      \"args\": [\n        \"--smol\",\n        \"$FIXTURE/release/bin/ares.js\",\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+  "receipt": {
+    "v": 1,
+    "target": "kimi",
+    "file": "$FIXTURE/.kimi-code/mcp.json",
+    "existed": true,
+    "keyExisted": true,
+    "priorPresent": true,
+    "prior": {
+      "command": "/fixture/prior",
+      "args": [
+        "mcp"
+      ]
+    },
+    "installed": {
+      "command": "bun",
+      "args": [
+        "--smol",
+        "$FIXTURE/release/bin/ares.js",
+        "mcp"
+      ]
+    }
+  }
+}

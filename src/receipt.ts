@@ -38,7 +38,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 const isDigest = (value: unknown): value is string => typeof value === "string" && hashPattern.test(value);
 
-function isImage(value: unknown): value is ConfigImage {
+export function isConfigImage(value: unknown): value is ConfigImage {
   if (!isRecord(value) || typeof value.mode !== "number" || !Number.isInteger(value.mode)
     || value.mode < 0 || value.mode > 0o7777) return false;
   if (value.bytes === null) return true;
@@ -47,21 +47,25 @@ function isImage(value: unknown): value is ConfigImage {
   return bytes.length <= SETUP_CONFIG_BYTES && bytes.toString("base64") === value.bytes;
 }
 
-export function readReceipt(path: string, target: ReceiptTarget): { image: ConfigImage; receipt?: Receipt } {
-  const image = readImage(path, RECEIPT_BYTES);
+export function readReceiptValue(path: string, limit: number): { image: ConfigImage; value?: unknown } {
+  const image = readImage(path, limit);
   if (image.bytes === null) return { image };
-  const refuse = (cause?: unknown): never => {
-    throw new Error(`${path}: invalid or unsupported receipt; inspect or restore the original receipt before retrying`, { cause });
-  };
-  let value: unknown;
   try {
     const text = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(image.bytes, "base64"));
-    value = JSON.parse(text);
-  } catch (error) {
-    return refuse(error);
+    return { image, value: JSON.parse(text) };
+  } catch (cause) {
+    throw new Error(`${path}: invalid receipt JSON; inspect or restore the original receipt before retrying`, { cause });
   }
+}
+
+export function readReceipt(path: string, target: ReceiptTarget): { image: ConfigImage; receipt?: Receipt } {
+  const { image, value } = readReceiptValue(path, RECEIPT_BYTES);
+  if (image.bytes === null) return { image };
+  const refuse = (): never => {
+    throw new Error(`${path}: invalid or unsupported receipt; inspect or restore the original receipt before retrying`);
+  };
   if (!isRecord(value) || value.version !== 1 || value.host !== target.host || value.file !== target.file
-    || value.name !== target.name || !isDigest(value.intent) || !isImage(value.before) || !isImage(value.after)) return refuse();
+    || value.name !== target.name || !isDigest(value.intent) || !isConfigImage(value.before) || !isConfigImage(value.after)) return refuse();
   const pending = value.pending;
   if (pending !== undefined && (!isRecord(pending) || (pending.kind !== "apply" && pending.kind !== "undo")
     || !isDigest(pending.start) || !isDigest(pending.result)
