@@ -31,6 +31,8 @@ export interface EntryResult {
   change: Change | "restored" | "removed";
   file: string;
   receipt: string;
+  /** A retained consumer receipt that the caller manages. */
+  legacy?: true;
 }
 
 const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
@@ -122,15 +124,19 @@ function result(selection: ReceiptTarget, receipt: string, change: EntryResult["
   return { file: selection.file, receipt, change };
 }
 
-function restoreOwned(receipt: ReceiptTarget & Pick<Receipt, "before" | "after">, current: ConfigImage, ownedOnly = false): ConfigImage {
+function assertInstalled(current: unknown, installed: unknown): void {
+  if (!isDeepStrictEqual(current, installed)) {
+    throw new Error("managed entry changed since installation; restore the installed entry or resolve the conflict manually");
+  }
+}
+
+function restoreOwned(receipt: Receipt, current: ConfigImage): ConfigImage {
   return editConfig(receipt.file, () => {
     const codec = configCodec(receipt);
-    if (!isDeepStrictEqual(codec.read(current), codec.read(receipt.after))) {
-      throw new Error("managed entry changed since installation; restore the installed entry or resolve the conflict manually");
-    }
-    const restored = !ownedOnly && current.bytes === receipt.after.bytes
+    assertInstalled(codec.read(current), codec.read(receipt.after));
+    const restored = current.bytes === receipt.after.bytes
       ? receipt.before
-      : codec.restore(receipt.before, receipt.after, current, { ownedOnly });
+      : codec.restore(receipt.before, receipt.after, current);
     return { bytes: restored.bytes, mode: current.mode };
   });
 }
@@ -223,31 +229,35 @@ export function undoEntry(options: EntryTarget & { receiptDir: string }): EntryR
 function undoLegacy(selection: ReceiptTarget, legacy: LegacyReceipt): EntryResult {
   const { file } = selection;
   const current = readImage(file, SETUP_CONFIG_BYTES);
-  return editConfig(file, () => {
+  const restored = editConfig(file, () => {
     const codec = configCodec(selection);
-    let prior: unknown;
-    let restored: ConfigImage;
+    const live = codec.read(current);
     if (legacy.kind === "agent-mem") {
-      if (!record(codec.read(legacy.after))) throw new Error("legacy receipt has no installed MCP entry");
-      prior = codec.read(legacy.before);
+      const installed = codec.read(legacy.after);
+      if (!record(installed)) throw new Error("legacy receipt has no installed MCP entry");
+      const prior = codec.read(legacy.before);
+      if (isDeepStrictEqual(live, prior)) return undefined;
+      assertInstalled(live, installed);
       // Legacy writers could reformat siblings or update hooks in the same file.
-      restored = restoreOwned({ ...selection, before: legacy.before, after: legacy.after }, current, true);
-    } else {
-      if (!isDeepStrictEqual(codec.read(current), legacy.installed)) {
-        throw new Error("managed entry changed since installation; restore the installed entry or resolve the conflict manually");
-      }
-      prior = legacy.priorToml === undefined
-        ? legacy.prior
-        : codec.read({ bytes: Buffer.from(legacy.priorToml).toString("base64"), mode: current.mode });
-      if (legacy.priorToml !== undefined && prior === undefined) throw new Error("prior TOML block has no managed entry");
-      restored = codec.put(current, prior, { keepEmpty: legacy.keyExisted });
-      if (!legacy.existed && restored.bytes !== null) {
-        const text = decoder.decode(Buffer.from(restored.bytes, "base64"));
-        const empty = HOSTS[selection.host].format.kind === "toml" ? text.trim() === "" : /^\s*\{\s*\}\s*$/.test(text);
-        if (empty) restored = { bytes: null, mode: current.mode };
-      }
+      const image = codec.restore(legacy.before, legacy.after, current, { ownedOnly: true });
+      return { image: { bytes: image.bytes, mode: current.mode }, prior };
     }
-    publishImage(file, SETUP_CONFIG_BYTES, current, restored);
-    return result(selection, legacy.path, prior === undefined ? "removed" : "restored");
+
+    const prior = legacy.priorToml === undefined
+      ? legacy.prior
+      : codec.read({ bytes: Buffer.from(legacy.priorToml).toString("base64"), mode: current.mode });
+    if (legacy.priorToml !== undefined && prior === undefined) throw new Error("prior TOML block has no managed entry");
+    if (isDeepStrictEqual(live, prior)) return undefined;
+    assertInstalled(live, legacy.installed);
+    const image = codec.put(current, prior, { keepEmpty: legacy.keyExisted });
+    if (!legacy.existed && image.bytes !== null) {
+      const text = decoder.decode(Buffer.from(image.bytes, "base64"));
+      const empty = HOSTS[selection.host].format.kind === "toml" ? text.trim() === "" : /^\s*\{\s*\}\s*$/.test(text);
+      if (empty) return { image: { bytes: null, mode: current.mode }, prior };
+    }
+    return { image, prior };
   });
+  const change = restored === undefined ? "unchanged" : restored.prior === undefined ? "removed" : "restored";
+  if (restored) publishImage(file, SETUP_CONFIG_BYTES, current, restored.image);
+  return { ...result(selection, legacy.path, change), legacy: true };
 }

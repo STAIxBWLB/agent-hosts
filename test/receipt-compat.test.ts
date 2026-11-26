@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { realPath, resolveHostPaths, undoEntry, type HostId } from "@staix/agent-hosts";
@@ -70,7 +70,7 @@ test.each([
   ["vault-mem", 1], ["agent-research", 1], ["agent-mem", 1], ["agent-mem", 2],
 ] as const)("%s v%i emitted receipt restores its MCP before-image", (consumer, version) => {
   const { file, receiptFile, receipt, before, target, hookFile, hookText } = replay(consumer, version);
-  expect(undoEntry(target)).toEqual({ change: "restored", file, receipt: receiptFile });
+  expect(undoEntry(target)).toEqual({ change: "restored", file, receipt: receiptFile, legacy: true });
   expect(readFileSync(file, "utf8")).toBe(before);
   expect(readFileSync(receiptFile, "utf8")).toBe(receipt);
   if (hookFile && hookText) expect(readFileSync(hookFile, "utf8")).toBe(hookText);
@@ -154,4 +154,16 @@ test("agent-mem undo keeps live sibling formatting even when its journal has dif
   put(receiptFile, JSON.stringify(raw));
   expect(undoEntry(target).change).toBe("restored");
   expect(readFileSync(file, "utf8")).toContain('"command": "keep"');
+});
+
+test.each([
+  ["vault-mem", 1], ["agent-research", 1], ["agent-mem", 1], ["agent-mem", 2],
+] as const)("%s v%i repeated undo retains the legacy receipt without publishing", (consumer, version) => {
+  const { file, receiptFile, receipt, before, target } = replay(consumer, version);
+  undoEntry(target);
+  const inode = statSync(file).ino;
+  expect(undoEntry(target)).toEqual({ change: "unchanged", file, receipt: receiptFile, legacy: true });
+  expect(statSync(file).ino).toBe(inode);
+  expect(readFileSync(file, "utf8")).toBe(before);
+  expect(readFileSync(receiptFile, "utf8")).toBe(receipt);
 });
