@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { HOSTS, resolveHostPaths } from "@staix/agent-hosts";
 
 const temporary: string[] = [];
@@ -32,6 +32,7 @@ test("resolves only the verified MCP files under the supplied home by default", 
     paths: expected,
     legacyPaths: expected,
     redirects: [],
+    refusals: [],
   });
   for (const [id, host] of Object.entries(HOSTS)) {
     expect<string>(host.id).toBe(id);
@@ -39,20 +40,50 @@ test("resolves only the verified MCP files under the supplied home by default", 
   }
 });
 
-test("expands QWEN_HOME and distinguishes unset JCODE_HOME from an explicitly empty value", () => {
+test("expands QWEN_HOME before requiring an absolute override", () => {
   const home = scratch();
-  expect(resolveHostPaths({ env: { QWEN_HOME: "~/custom/qwen", JCODE_HOME: "" }, home }).paths)
-    .toMatchObject({ qwen: [join(home, "custom/qwen/settings.json")], jcode: [resolve("mcp.json")] });
+  expect(resolveHostPaths({ env: { QWEN_HOME: "~/custom/qwen" }, home }).paths.qwen)
+    .toEqual([join(home, "custom/qwen/settings.json")]);
   expect(resolveHostPaths({ env: { QWEN_HOME: "~" }, home }).paths.qwen).toEqual([join(home, "settings.json")]);
+});
+
+test("refuses an explicitly empty JCODE_HOME and uses the default if it is unset", () => {
+  const home = scratch();
+  const found = resolveHostPaths({ env: { JCODE_HOME: "" }, home });
+  expect(found.paths.jcode).toBeUndefined();
+  expect(found.legacyPaths.jcode).toBeUndefined();
+  expect(found.refusals).toEqual([{
+    host: "jcode", code: "empty-override", variable: "JCODE_HOME",
+    reason: "JCODE_HOME is set but empty; unset it or supply an absolute directory",
+  }]);
+  expect(found.paths.kimi).toEqual([join(home, ".kimi-code/mcp.json")]);
   expect(resolveHostPaths({ env: {}, home }).paths.jcode).toEqual([join(home, ".jcode/mcp.json")]);
 });
 
-test("honors absolute OpenCode and Gemini roots and falls back on relative roots", () => {
+test.each([
+  ["claude", "CLAUDE_CONFIG_DIR"], ["codex", "CODEX_HOME"], ["kimi", "KIMI_CODE_HOME"],
+  ["pi", "PI_CODING_AGENT_DIR"], ["qwen", "QWEN_HOME"], ["jcode", "JCODE_HOME"],
+  ["opencode", "XDG_CONFIG_HOME"], ["gemini", "GEMINI_CLI_HOME"],
+] as const)("refuses a relative override for %s (%s) without blocking other hosts", (host, variable) => {
+  const home = scratch();
+  const found = resolveHostPaths({ home, env: { [variable]: "relative" } });
+  expect(found.paths[host]).toBeUndefined();
+  expect(found.legacyPaths[host]).toBeUndefined();
+  expect(Object.keys(found.paths)).toHaveLength(Object.keys(HOSTS).length - 1);
+  expect(found.refusals).toEqual([{
+    host, code: "relative-override", variable,
+    reason: `${variable} is relative; unset it or supply an absolute directory`,
+  }]);
+});
+
+test("honors absolute OpenCode and Gemini roots and treats empty roots as unset", () => {
   const home = scratch(), xdg = join(home, "xdg"), gemini = join(home, "gemini");
   expect(resolveHostPaths({ env: { XDG_CONFIG_HOME: xdg, GEMINI_CLI_HOME: gemini }, home }).paths)
     .toMatchObject({ opencode: [join(xdg, "opencode/opencode.json")], gemini: [join(gemini, ".gemini/settings.json")] });
-  expect(resolveHostPaths({ env: { XDG_CONFIG_HOME: "relative", GEMINI_CLI_HOME: "relative" }, home }).paths)
-    .toMatchObject({ opencode: [join(home, ".config/opencode/opencode.json")], gemini: [join(home, ".gemini/settings.json")] });
+  const defaults = resolveHostPaths({ env: { XDG_CONFIG_HOME: "", GEMINI_CLI_HOME: "" }, home });
+  expect(defaults.paths.opencode).toEqual([join(home, ".config/opencode/opencode.json")]);
+  expect(defaults.paths.gemini).toEqual([join(home, ".gemini/settings.json")]);
+  expect(defaults.refusals).toEqual([]);
 });
 
 test("uses injected environment values and treats whitespace-only trim-presence overrides as unset", () => {
@@ -83,7 +114,7 @@ test.each(["codex-accounts/example/home", "codex-runtime-home/home"])(
       { target: "codex", from: join(codexProfile, "config.toml"), to: join(home, ".codex/config.toml"), reason: "Orca re-syncs this managed file from the personal source" },
     ]);
     expect(resolveHostPaths({ env, home, hosts, redirectManagedProfiles: false })).toEqual({
-      home, paths: legacyPaths, legacyPaths, redirects: [],
+      home, paths: legacyPaths, legacyPaths, redirects: [], refusals: [],
     });
   },
 );
@@ -94,4 +125,19 @@ test("selects the project file only when its scope and workspace root are suppli
   const options = { env: {}, home, hosts, scopes };
   expect(resolveHostPaths(options).paths).toEqual({ kimi: [] });
   expect(resolveHostPaths({ ...options, workspaceRoot }).paths).toEqual({ kimi: [join(workspaceRoot, ".kimi-code/mcp.json")] });
+});
+
+test.each([
+  ["claude", "CLAUDE_CONFIG_DIR", ".claude.json"],
+  ["codex", "CODEX_HOME", "config.toml"],
+  ["kimi", "KIMI_CODE_HOME", "mcp.json"],
+  ["pi", "PI_CODING_AGENT_DIR", "mcp.json"],
+] as const)("trims %s overrides before resolving a nonblank value", (host, variable, filename) => {
+  const home = scratch(), absolute = join(home, "custom");
+  const padded = resolveHostPaths({ home, env: { [variable]: `  ${absolute}  ` } });
+  expect(padded.paths[host]).toEqual([join(absolute, filename)]);
+  expect(padded.refusals).toEqual([]);
+  const blank = resolveHostPaths({ home, env: { [variable]: " \t " } });
+  expect(blank.paths[host]).toEqual(resolveHostPaths({ home, env: {} }).paths[host]);
+  expect(blank.refusals).toEqual([]);
 });

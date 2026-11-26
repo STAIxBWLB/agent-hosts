@@ -10,6 +10,8 @@ export interface HostConfig {
   scope: HostScope;
   path: string;
   override?: HomeOverride;
+  routeVariables?: readonly string[];
+  mergedFiles?: readonly string[];
   personalSource?: { profile: "claude" | "codex"; orcaHomeVariable: "ORCA_USER_DATA_PATH" };
 }
 
@@ -86,7 +88,13 @@ export const HOSTS = {
   },
   opencode: {
     id: "opencode",
-    files: [{ scope: "user", path: "opencode/opencode.json", override: { key: "XDG_CONFIG_HOME", rule: "absolute-only", directory: ".config" } }],
+    files: [{
+      scope: "user",
+      path: "opencode/opencode.json",
+      override: { key: "XDG_CONFIG_HOME", rule: "absolute-only", directory: ".config" },
+      routeVariables: ["OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG_CONTENT"],
+      mergedFiles: ["opencode.jsonc", "config.json"],
+    }],
     format: { kind: "json", key: "mcp" },
     entry: { type: "local", command: "string[]", enabled: "boolean" },
     verified: ["1.18.35"],

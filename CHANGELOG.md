@@ -14,5 +14,6 @@ During 0.x, a breaking API change, receipt format change, or host path change is
 
 ### Consumer behavior changes
 
-- Vault-mem and agent-research gain `QWEN_HOME` tilde expansion and explicit empty `JCODE_HOME` resolution.
+- Vault-mem and agent-research gain `QWEN_HOME` tilde expansion and refuse an explicitly empty `JCODE_HOME`.
+- Host override validation, OpenCode routing and merge checks, and Jcode interpolation checks are shared by all consumers. Refusals and unchanged undo results carry stable codes.
 - Antigravity's project writer stays with each consumer pending exact-version evidence. Other recorded behavior differences are documented in the [fixture divergence table](fixtures/DIVERGENCES.md).

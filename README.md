@@ -21,7 +21,7 @@ bun add --exact @staix/agent-hosts@0.1.0
 | `opencode` | user `~/.config/opencode/opencode.json` | JSON `mcp` | `1.18.35` |
 | `gemini` | user `~/.gemini/settings.json` | JSON `mcpServers` | `0.61.0` |
 
-`HOSTS` records the file scopes, environment overrides, format, entry fields, and verified versions. `CLAUDE_CONFIG_DIR` moves the Claude file into that directory as `.claude.json`. `QWEN_HOME` expands `~` against the injected home. A set but empty `JCODE_HOME` resolves against the current working directory. OpenCode and Gemini honor absolute `XDG_CONFIG_HOME` and `GEMINI_CLI_HOME` respectively. [Version evidence](https://github.com/STAIxBWLB/agent-hosts/pull/5)
+`HOSTS` records the file scopes, environment overrides, format, entry fields, and verified versions. `CLAUDE_CONFIG_DIR` moves the Claude file into that directory as `.claude.json`. `QWEN_HOME` expands `~` against the injected home. A set but empty `JCODE_HOME` is refused. OpenCode and Gemini honor absolute `XDG_CONFIG_HOME` and `GEMINI_CLI_HOME` respectively, with an empty value treated as unset. [Version evidence](https://github.com/STAIxBWLB/agent-hosts/pull/5)
 
 The direct workspace Antigravity (`agy`) configuration remains with each consumer for 0.1.0. See the [spec ruling](https://github.com/STAIxBWLB/agent-hosts/issues/1#antigravity-agy-is-not-in-010) and [fixture divergences](fixtures/DIVERGENCES.md).
 
@@ -48,10 +48,14 @@ if (plan.change === "refused") throw new Error(plan.reason);
 ```
 
 - `realPath(path)` resolves an existing physical path and throws for a missing path or dangling link. It handles Bun's backslash and symlink-parent edge cases.
-- `resolveHostPaths({ env, home, workspaceRoot?, hosts?, scopes?, redirectManagedProfiles? })` returns `home`, per-host `paths`, pre-redirect `legacyPaths`, and `redirects`. Pass the environment and home explicitly. It selects user files by default. Supply `scopes: ["project"]` and `workspaceRoot` for Kimi's project file. Select exactly one file per host when calling the entry API. Managed Claude and Codex profiles redirect to the personal source by default. Set `redirectManagedProfiles: false` to keep the configured path.
-- `planEntry({ host, paths, name, entry })` returns `add`, `replace`, `unchanged`, or `refused` with a reason. A successful preview contains the before and after images and an intent digest. Supply the host's entry shape as a plain JSON-compatible object. Preview writes nothing.
-- `applyEntry(plan, { receiptDir })` rechecks the plan under an exclusive lock, publishes the change, and records a versioned receipt. Use an absolute receipt directory. Generate a fresh plan if the file changed since preview. A matching entry with no receipt stays unclaimed.
-- `undoEntry({ host, paths, name, receiptDir })` restores the prior owned entry or removes the one it installed. A conflicting edit to the entry is left in place and the error names the file. The result identifies the config and receipt paths. If `legacy: true` is returned, the legacy receipt still exists and the consumer manages its cleanup.
+- `resolveHostPaths({ env, home, workspaceRoot?, hosts?, scopes?, redirectManagedProfiles? })` returns `home`, per-host `paths`, pre-redirect `legacyPaths`, `redirects`, and per-host `refusals`. Pass the environment and home explicitly. It selects user files by default. Supply `scopes: ["project"]` and `workspaceRoot` for Kimi's project file. Select exactly one file per host when calling the entry API. Managed Claude and Codex profiles redirect to the personal source by default. Set `redirectManagedProfiles: false` to keep the configured path. The resolver trims Claude, Codex, Kimi, and Pi overrides and omits files whose location override is invalid. Other hosts remain available.
+- `planEntry({ host, paths, name, entry })` returns `add`, `replace`, `unchanged`, or `refused` with a stable `code` and a human-readable `reason`. A successful preview contains the before and after images and an intent digest. Supply the host's entry shape as a plain JSON-compatible object. Preview writes nothing.
+- `applyEntry(plan, { receiptDir, env? })` rechecks file state and host policy under an exclusive lock, publishes the change, and records a versioned receipt. Use an absolute receipt directory. Generate a fresh plan if the file changed since preview. A matching entry with no receipt stays unclaimed. Supply refreshed `env` when OpenCode routing may have changed since preview. The plan carries routing-variable names without storing their values.
+- `undoEntry({ host, paths, name, receiptDir })` restores the prior owned entry or removes the one it installed. A conflicting edit to the entry is left in place and the error names the file. The result identifies the config and receipt paths. If `legacy: true` is returned, the legacy receipt still exists and the consumer manages its cleanup. An unchanged undo carries a code from `UNDO_NOOP_CODES`.
+- `REFUSAL_CODES` lists stable refusal identifiers used by both path and entry operations. Apply and undo throw `EntryRefusal` with a `code` and `reason`.
+- `UNDO_NOOP_CODES` lists `no-receipt`, `entry-already-absent`, and `entry-already-restored` for unchanged undo results.
+
+OpenCode preview and apply refuse nonblank `OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, or `OPENCODE_CONFIG_CONTENT` and sibling `opencode.jsonc` or `config.json` files. Undo remains available for the recorded global file. Jcode preview refuses `${` interpolation in the command or arguments.
 
 Writes use bounded reads, refuse linked paths, and publish through a temporary file while preserving the config's mode. Configuration is capped at 8 MiB. The lock serializes package writers. If a stale lock blocks an operation, confirm that its writer has stopped before removing the lock named in the error.
 
@@ -74,9 +78,10 @@ The JSON codec accepts strict JSON and keeps unrelated bytes. The TOML codecs us
 | --- | --- |
 | `HostId`, `HostScope` | Keys of `HOSTS` and the `user`, `project`, or `hub-home` scope. |
 | `HostDefinition`, `HostConfig`, `HostFormat`, `HomeOverride` | Host metadata, per-file scope and path, JSON key or TOML table, and environment override rules. |
-| `ResolveHostPathsOptions`, `HostPaths`, `HostRedirect` | Resolver inputs, its path maps, and managed-profile redirect details. |
-| `EntryTarget`, `PlanEntryOptions` | Host, resolved paths, and name. Planning adds the desired `entry`. |
+| `ResolveHostPathsOptions`, `HostPaths`, `HostRedirect`, `HostRefusal` | Resolver inputs, its path maps, managed-profile redirects, and path refusals. |
+| `EntryTarget`, `PlanEntryOptions`, `ApplyEntryOptions` | Host, resolved paths, and name. Planning adds the desired `entry`. Apply takes a receipt directory and optional refreshed environment. |
 | `EntryPlan`, `EntryResult` | Preview result and apply or undo result. |
+| `RefusalCode`, `UndoNoopCode` | Machine-readable identifiers from `REFUSAL_CODES` and `UNDO_NOOP_CODES`. |
 | `ConfigImage`, `JsonMcpCodecOptions` | Base64 `bytes` or `null` for an absent file, plus numeric `mode`, and the JSON codec's key and entry options. |
 
 ## Consumer migration
@@ -90,7 +95,9 @@ Use one PR per consumer and pin `@staix/agent-hosts` to the exact release. Keep 
 | agent-mem | Land the `@staix/agent-mem/platform` re-export of `realPath` first. Move MCP paths, lexical codecs, and entry handling to this package. Pass `amem` and `<memory home>/setup`. Keep hooks, the Pi extension, drift reports, writer roots, and the Antigravity writer local. Retain the prior journal when undo returns `legacy: true` because it also owns hook history. |
 | agent-hub | Optionally adopt the path and format table after the other migrations if it removes duplicate code. Keep its project-scoped writers and adapter policy local. |
 
-Vault-mem and agent-research gain Qwen tilde expansion and explicit empty Jcode override semantics. Both can disable managed-profile redirects to preserve their literal-path behavior. Consumer CLI validation and receipt cleanup stay in the consumer.
+Vault-mem and agent-research gain Qwen tilde expansion and refuse an explicitly empty Jcode override. Both can disable managed-profile redirects to preserve their literal-path behavior. The package validates host overrides. Receipt cleanup stays with the consumer.
+
+Treat export and entry result shapes, host metadata, and the version 1 receipt layout and location as the shared 0.1.0 protocol. Branch on refusal codes. Later 0.x releases continue to read earlier 0.x receipts.
 
 ## Development and release
 

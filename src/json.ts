@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { SETUP_CONFIG_BYTES } from "./toml.ts";
+import { EntryRefusal } from "./refusal.ts";
 
 export interface ConfigImage { bytes: string | null; mode: number }
 
@@ -15,6 +16,9 @@ export interface JsonMcpCodecOptions { canonicalKey: string; entryName: string; 
 export function createJsonMcpCodec(options: JsonMcpCodecOptions) {
   const { canonicalKey, entryName, label } = options, keys = new Set([canonicalKey, ...(options.aliases ?? [])]);
   const fail = (): never => { throw Error(`setup ${label} MCP configuration unavailable or ambiguous; no configuration changed`); };
+  const size = (): never => {
+    throw new EntryRefusal("size-limit", `setup ${label} MCP configuration exceeds 8 MiB; reduce the file size before retrying`);
+  };
   const whitespace = (text: string, start: number) => { let at = start; while (at < text.length && /[ \t\r\n]/.test(text[at]!)) at++; return at; };
   function stringEnd(text: string, start: number): number {
     let at = start + 1;
@@ -75,9 +79,10 @@ export function createJsonMcpCodec(options: JsonMcpCodecOptions) {
   function document(image: ConfigImage): Document {
     let text = "{}";
     if (image.bytes !== null) {
-      if (image.bytes.length > Math.ceil(SETUP_CONFIG_BYTES / 3) * 4) return fail();
+      if (image.bytes.length > Math.ceil(SETUP_CONFIG_BYTES / 3) * 4) return size();
       const bytes = Buffer.from(image.bytes, "base64");
-      if (bytes.toString("base64") !== image.bytes || bytes.length > SETUP_CONFIG_BYTES) return fail();
+      if (bytes.length > SETUP_CONFIG_BYTES) return size();
+      if (bytes.toString("base64") !== image.bytes) return fail();
       try { text = decode.decode(bytes); } catch { return fail(); }
     }
     let value: unknown; try { value = JSON.parse(text); } catch { return fail(); }
@@ -108,7 +113,7 @@ export function createJsonMcpCodec(options: JsonMcpCodecOptions) {
     let text = doc.text;
     for (const edit of edits.sort((a, b) => b.start - a.start)) text = text.slice(0, edit.start) + edit.text + text.slice(edit.end);
     if (text === doc.text) return image;
-    if (Buffer.byteLength(text) > SETUP_CONFIG_BYTES) return fail();
+    if (Buffer.byteLength(text) > SETUP_CONFIG_BYTES) return size();
     const result = { bytes: Buffer.from(text).toString("base64"), mode: image.mode };
     document(result); return result;
   }

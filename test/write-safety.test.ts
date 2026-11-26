@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, truncateSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { applyEntry, planEntry, realPath, resolveHostPaths, SETUP_CONFIG_BYTES, undoEntry, type ConfigImage } from "@staix/agent-hosts";
+import { applyEntry, EntryRefusal, planEntry, realPath, REFUSAL_CODES, resolveHostPaths, SETUP_CONFIG_BYTES, undoEntry, type ConfigImage, type RefusalCode } from "@staix/agent-hosts";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -28,6 +28,8 @@ test("refuses link targets and link ancestors without opening or changing the ph
   symlinkSync(outside, dirname(file), "dir");
   const plan = planEntry({ ...target, entry: { command: "fixture" } });
   if (plan.change !== "refused") throw new Error("expected linked configuration to be refused");
+  expect(plan.code).toBe("unsafe-path");
+  expect(REFUSAL_CODES).toContain(plan.code);
   expect(plan.reason).toContain(file);
   expect(() => applyEntry(plan, { receiptDir })).toThrow("without links");
   expect(readFileSync(physical, "utf8")).toBe("{}");
@@ -70,6 +72,7 @@ test.each([
   writeFileSync(file, original);
   const plan = planEntry({ ...target, entry: { command: "fixture" } });
   expect(plan.change).toBe("refused");
+  if (plan.change === "refused") expect(plan.code).toBe("invalid-configuration");
   expect(() => applyEntry(plan, { receiptDir })).toThrow(`${file}:`);
   expect(() => applyEntry(plan, { receiptDir })).toThrow("inspect the configuration");
   expect(readFileSync(file, "utf8")).toBe(original);
@@ -80,7 +83,7 @@ test("bounds configuration and receipt reads", () => {
   const { file, target, receiptDir } = fixture();
   const applied = applyEntry(planEntry({ ...target, entry: { command: "fixture" } }), { receiptDir });
   truncateSync(file, SETUP_CONFIG_BYTES + 1);
-  expect(planEntry({ ...target, entry: {} })).toMatchObject({ change: "refused", reason: expect.stringContaining("exceeds") });
+  expect(planEntry({ ...target, entry: {} })).toMatchObject({ change: "refused", code: "size-limit", reason: expect.stringContaining("exceeds") });
   truncateSync(applied.receipt, 3 * SETUP_CONFIG_BYTES);
   expect(() => undoEntry({ ...target, receiptDir })).toThrow(`${applied.receipt}: exceeds`);
 });
@@ -91,6 +94,7 @@ test("exclusive lock refuses a stale lock and leaves its contents unchanged", ()
   const lock = file + ".agent-hosts.lock";
   writeFileSync(lock, "previous writer");
   const plan = planEntry({ ...target, entry: { command: "fixture" } });
+  expectRefusal(() => applyEntry(plan, { receiptDir }), "lock-held");
   expect(() => applyEntry(plan, { receiptDir })).toThrow(lock);
   expect(() => applyEntry(plan, { receiptDir })).toThrow("remove the lock manually");
   expect(readFileSync(lock, "utf8")).toBe("previous writer");
@@ -103,6 +107,7 @@ test("a stale preview cannot overwrite a third-party edit", () => {
   mkdirSync(dirname(file), { recursive: true });
   const thirdParty = '{"unrelated":true}';
   writeFileSync(file, thirdParty);
+  expectRefusal(() => applyEntry(plan, { receiptDir }), "changed-since-preview");
   expect(() => applyEntry(plan, { receiptDir })).toThrow("generate a fresh plan");
   expect(readFileSync(file, "utf8")).toBe(thirdParty);
   expect(existsSync(receiptDir)).toBe(false);
@@ -175,3 +180,16 @@ test("refuses TOML inline parents when editing would re-render a sibling entry",
   expect(readFileSync(file, "utf8")).toBe(original);
   expect(existsSync(receiptDir)).toBe(false);
 });
+
+function expectRefusal(run: () => unknown, code: RefusalCode): void {
+  try {
+    run();
+  } catch (error) {
+    if (!(error instanceof EntryRefusal)) throw error;
+    expect(error.code).toBe(code);
+    expect(REFUSAL_CODES).toContain(error.code);
+    expect(error.reason).toBe(error.message);
+    return;
+  }
+  throw new Error(`expected refusal ${code}`);
+}
