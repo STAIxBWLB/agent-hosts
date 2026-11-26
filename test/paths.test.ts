@@ -26,6 +26,7 @@ test("resolves only the verified MCP files under the supplied home by default", 
     jcode: [join(home, ".jcode/mcp.json")],
     opencode: [join(home, ".config/opencode/opencode.json")],
     gemini: [join(home, ".gemini/settings.json")],
+    agy: [],
   };
   expect(resolveHostPaths({ env: {}, home })).toEqual({
     home,
@@ -34,8 +35,8 @@ test("resolves only the verified MCP files under the supplied home by default", 
     redirects: [],
     refusals: [],
     roots: Object.fromEntries(Object.entries(expected).map(([host, [file]]) => {
-      const root = host === "claude" ? join(home, ".claude") : dirname(file!);
-      return [host, { current: [root], legacy: [root] }];
+      const roots = file === undefined ? [] : [host === "claude" ? join(home, ".claude") : dirname(file)];
+      return [host, { current: roots, legacy: roots }];
     })),
   });
   for (const [id, host] of Object.entries(HOSTS)) {
@@ -131,12 +132,20 @@ test.each(["codex-accounts/example/home", "codex-runtime-home/home"])(
   },
 );
 
-test("selects the project file only when its scope and workspace root are supplied", () => {
+test.each([
+  ["kimi", ".kimi-code/mcp.json", [".kimi-code/mcp.json"]],
+  ["agy", ".agents/mcp_config.json", []],
+] as const)("selects the %s project file only with project scope and a workspace root", (host, file, userFiles) => {
   const home = scratch(), workspaceRoot = scratch();
-  const hosts = ["kimi"] as const, scopes = ["project"] as const;
-  const options = { env: {}, home, hosts, scopes };
-  expect(resolveHostPaths(options).paths).toEqual({ kimi: [] });
-  expect(resolveHostPaths({ ...options, workspaceRoot }).paths).toEqual({ kimi: [join(workspaceRoot, ".kimi-code/mcp.json")] });
+  const options = { env: {}, home, hosts: [host] };
+  const scopes = ["project"] as const;
+  expect(resolveHostPaths({ ...options, workspaceRoot }).paths[host])
+    .toEqual(userFiles.map((userFile) => join(home, userFile)));
+  expect(resolveHostPaths({ ...options, scopes }).paths[host]).toEqual([]);
+  const target = join(workspaceRoot, file);
+  const resolved = resolveHostPaths({ ...options, scopes, workspaceRoot });
+  expect(resolved.paths[host]).toEqual([target]);
+  expect(resolved.legacyPaths[host]).toEqual([target]);
 });
 
 test.each([

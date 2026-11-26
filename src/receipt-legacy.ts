@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { ConfigImage } from "./json.ts";
-import { isConfigImage, readReceiptValue, type ReceiptTarget } from "./receipt.ts";
+import { digest, isConfigImage, readReceiptValue, type ReceiptTarget } from "./receipt.ts";
 import { SETUP_CONFIG_BYTES } from "./toml.ts";
 import { EntryRefusal } from "./refusal.ts";
 
@@ -59,9 +59,12 @@ function entryReceipt(path: string, target: ReceiptTarget, file: string, raw: un
 export function readLegacyReceipt(directory: string, target: ReceiptTarget, legacyPaths: readonly string[] = []): LegacyReceipt | undefined {
   const candidates = [...new Set([target.file, ...legacyPaths])];
   if (target.name === "amem") {
-    const path = join(directory, `${target.host}.json`);
+    // Agent-mem keys its direct agy journal by the Git workspace root.
+    const workspace = target.host === "agy" ? dirname(dirname(target.file)) : undefined;
+    const filename = workspace === undefined ? `${target.host}.json` : `agy-${digest(workspace)}.json`;
+    const path = join(directory, filename);
     const { image, value } = readReceiptValue(path, 12 * SETUP_CONFIG_BYTES);
-    return image.bytes === null ? undefined : memoryReceipt(path, target, candidates, value);
+    return image.bytes === null ? undefined : memoryReceipt(path, target, workspace === undefined ? candidates : [target.file], value);
   }
   if (target.name !== "vmem" && target.name !== "ares") return undefined;
 

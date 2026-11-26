@@ -2,9 +2,7 @@
 
 | Copy | Case | Consumer result | Package result | Reason |
 | --- | --- | --- | --- | --- |
-| vault-mem | Antigravity (`agy`) | Writes and undoes the project MCP entry | Excluded from 0.1.0 | Project MCP shape lacks exact-version evidence, per #1 |
-| agent-research | Antigravity (`agy`) | Writes and undoes the project MCP entry | Excluded from 0.1.0 | Project MCP shape lacks exact-version evidence, per #1 |
-| agent-mem | Antigravity (`agy`) | Writes and undoes the project MCP entry | Excluded from 0.1.0 | Project MCP shape lacks exact-version evidence, per #1 |
+| agent-mem | Antigravity Git and directory ownership | Binds setup to a Git root, refuses tracked config, and tracks a created directory for cleanup | Resolves the supplied project root and owns only the MCP entry | Git checks and directory ownership stay with the consumer |
 | vault-mem | Legacy receipt undo | Deletes the consumed v1 receipt | Retains the legacy file | Legacy receipts remain with the consumer |
 | agent-research | Legacy receipt undo | Deletes the consumed v1 receipt | Retains the legacy file | Legacy receipts remain with the consumer |
 | agent-mem | Legacy receipt undo | Restores MCP and hook changes, then removes the journal | Restores the MCP entry and retains the journal | The consumer owns hook state and history |

@@ -7,7 +7,7 @@ const common = ["claude", "codex", "kimi", "pi", "qwen", "jcode"];
 const destination = join(import.meta.dir, "../fixtures/copies");
 mkdirSync(destination, { recursive: true });
 captureConsumerCopies(process.argv[2], (copy, commit, run) => {
-  const hosts = copy === "agent-mem" ? [...common, "opencode", "gemini"] : common;
+  const hosts = copy === "agent-mem" ? [...common, "opencode", "gemini", "agy"] : [...common, "agy"];
   const cases: Array<readonly [string, "standard" | "tilde-home" | "empty-home"]> =
     hosts.map((host) => [host, "standard"]);
   if (copy !== "agent-mem") cases.push(["qwen", "tilde-home"], ["jcode", "empty-home"]);
@@ -21,6 +21,7 @@ function recorder(copy: ConsumerCopy): string {
   const memory = copy === "agent-mem";
   const vault = copy === "vault-mem";
   return `
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ${memory ? "planSetup, applySetup, undoSetup" : "runSetup"} } from "./src/setup.ts";
@@ -41,6 +42,13 @@ const put = (file, text, mode = 0o600) => {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   writeFileSync(file, text, { mode });
 };
+const workspaceRoot = host === "agy" ? join(home, "workspace") : undefined;
+if (workspaceRoot) {
+  mkdirSync(workspaceRoot);
+  env.PATH += ":/usr/bin:/bin";
+  execFileSync("/usr/bin/git", ["init", "-q", workspaceRoot], { env });
+}
+const cwd = workspaceRoot ?? home;
 put(runtime, "#!/bin/sh\\nexit 1\\n", 0o700);
 put(join(bin, host), "#!/bin/sh\\necho 0.0.0-fixture\\n", 0o700);
 const table = {
@@ -52,6 +60,7 @@ const table = {
   jcode: [join(env.JCODE_HOME || join(home, ".jcode"), "mcp.json"), join(env.JCODE_HOME || join(home, ".jcode"), "config.toml")],
   opencode: [join(env.XDG_CONFIG_HOME, "opencode/opencode.json")],
   gemini: [join(env.GEMINI_CLI_HOME, ".gemini/settings.json")],
+  agy: [join(cwd, ".agents/mcp_config.json")],
 };
 const files = ${memory ? "table[host]" : "table[host].slice(0, 1)"};
 const file = files[0];
@@ -98,12 +107,12 @@ const native = (argv, staged) => {
   }
   put(stagedFile, host === "codex" ? Bun.TOML.stringify(doc) : JSON.stringify(doc, null, 2) + "\\n");
 };
-const options = { env, cwd: home, root, bun: runtime, native };` : vault ? `
-const options = { env, cwd: home, home: env.VMEM_HOME, entry: { command: runtime, args: ["mcp"] } };` : `
+const options = { env, cwd, root, bun: runtime, native };` : vault ? `
+const options = { env, cwd, home: env.VMEM_HOME, entry: { command: runtime, args: ["mcp"] } };` : `
 const root = join(home, "release");
 put(join(root, "package.json"), readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 put(join(root, "bin/ares.js"), "// fixture runtime is not executed\\n");
-const options = { env, cwd: home, root };`}
+const options = { env, cwd, root };`}
 const preview = () => ${memory ? 'planSetup(host, "preview", options)' : 'runSetup(host, "dry-run", options)'};
 const apply = () => ${memory ? 'applySetup(planSetup(host, "apply", options), options)' : 'runSetup(host, "apply", options)'};
 const undo = () => ${memory ? 'undoSetup(planSetup(host, "undo", options), options)' : 'runSetup(host, "undo", options)'};
@@ -138,7 +147,7 @@ if (variant === "tilde-home") {
   const entry = (host === "codex" ? Bun.TOML.parse(afterApply[file].text) : JSON.parse(afterApply[file].text))[key][name];
   const undone = undo();
   ${memory ? 'if (undone.restored[0] !== host) throw new Error(JSON.stringify(undone));' : 'assertChange(undone.actions[0]?.change, replace ? "restore" : "remove");'}
-  console.log(JSON.stringify({ id: host + "-" + variant, host, name, key, file, env, plan, before, afterApply, afterUndo: snapshot(), entry }).replaceAll(home, "$FIXTURE"));
+  console.log(JSON.stringify({ id: host + "-" + variant, host, name, key, file, env, workspaceRoot, plan, before, afterApply, afterUndo: snapshot(), entry }).replaceAll(home, "$FIXTURE"));
 }
 `;
 }
