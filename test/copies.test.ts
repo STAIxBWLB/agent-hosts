@@ -119,7 +119,7 @@ for (const consumer of consumers) {
         expect(preview.change).toBe(item.plan.change);
       }
       if (preview.change !== "add" && preview.change !== "replace") throw new Error("expected a writable fixture");
-      expect(applyEntry(preview, target).change).toBe(preview.change);
+      expect(applyEntry(preview, { ...target, env: item.env }).change).toBe(preview.change);
 
       const applied = snapshot(files);
       const installed = applied[file];

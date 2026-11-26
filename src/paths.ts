@@ -37,6 +37,7 @@ export interface HostPaths {
   /** Pre-redirect paths for validating receipts from older setup versions. */
   legacyPaths: Partial<Record<HostId, string[]>>;
   redirects: HostRedirect[];
+  roots: Partial<Record<HostId, { current: string[]; legacy: string[] }>>;
   refusals: HostRefusal[];
 }
 
@@ -89,12 +90,14 @@ export function resolveHostPaths(options: ResolveHostPathsOptions): HostPaths {
   const paths: HostPaths["paths"] = {};
   const legacyPaths: HostPaths["legacyPaths"] = {};
   const redirects: HostRedirect[] = [];
+  const roots: HostPaths["roots"] = {};
   const refusals: HostRefusal[] = [];
   for (const target of new Set(hosts ?? (Object.keys(HOSTS) as HostId[]))) {
     const host: HostDefinition = HOSTS[target];
     const firstRefusal = refusals.length;
     const current: string[] = [];
     const legacy: string[] = [];
+    const currentRoots: string[] = [], legacyRoots: string[] = [];
     for (const file of host.files) {
       if (!scopes.includes(file.scope)) continue;
       const base = file.scope === "project" ? workspaceRoot : home;
@@ -114,21 +117,28 @@ export function resolveHostPaths(options: ResolveHostPathsOptions): HostPaths {
         }
       }
       legacy.push(from);
+      const siblingRoot = file.defaultSiblingRoot && file.override && !env[file.override.key]?.trim()
+        ? join(base, file.defaultSiblingRoot)
+        : dirname(from);
+      legacyRoots.push(siblingRoot);
       const personal = file.personalSource;
       if (redirectManagedProfiles && personal) {
         const orcaRoot = env[personal.orcaHomeVariable]?.trim() || join(home, "Library", "Application Support", "orca");
         const to = join(home, file.override?.directory ?? "", file.path);
         if (from !== to && orcaHome(root, personal.profile, orcaRoot)) {
           current.push(to);
+          currentRoots.push(file.defaultSiblingRoot ? join(home, file.defaultSiblingRoot) : dirname(to));
           redirects.push({ target, from, to, reason: "Orca re-syncs this managed file from the personal source" });
           continue;
         }
       }
       current.push(from);
+      currentRoots.push(siblingRoot);
     }
     if (!current.length && refusals.length !== firstRefusal) continue;
     paths[target] = current;
     legacyPaths[target] = legacy;
+    roots[target] = { current: currentRoots, legacy: legacyRoots };
   }
-  return { home, paths, legacyPaths, redirects, refusals };
+  return { home, paths, legacyPaths, redirects, refusals, roots };
 }

@@ -10,11 +10,11 @@ interface Document { text: string; root: ObjectSpan; container?: Member; servers
 interface Edit { start: number; end: number; text: string }
 const decode = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const same = (a: ConfigImage, b: ConfigImage) => a.bytes === b.bytes && a.mode === b.mode;
-export interface JsonMcpCodecOptions { canonicalKey: string; entryName: string; aliases?: readonly string[]; label: string }
+export interface JsonMcpCodecOptions { canonicalKey: string; entryName: string; aliases?: readonly string[]; label: string; preferCanonical?: boolean }
 
 /** Strict JSON only. Shared lexical edits never re-render unrelated configuration data. */
 export function createJsonMcpCodec(options: JsonMcpCodecOptions) {
-  const { canonicalKey, entryName, label } = options, keys = new Set([canonicalKey, ...(options.aliases ?? [])]);
+  const { canonicalKey, entryName, label, preferCanonical } = options, keys = new Set([canonicalKey, ...(options.aliases ?? [])]);
   const fail = (): never => { throw Error(`setup ${label} MCP configuration unavailable or ambiguous; no configuration changed`); };
   const size = (): never => {
     throw new EntryRefusal("size-limit", `setup ${label} MCP configuration exceeds 8 MiB; reduce the file size before retrying`);
@@ -88,7 +88,8 @@ export function createJsonMcpCodec(options: JsonMcpCodecOptions) {
     let value: unknown; try { value = JSON.parse(text); } catch { return fail(); }
     if (!value || typeof value !== "object" || Array.isArray(value)) return fail();
     const root = objectSpan(text, whitespace(text, 0));
-    const containers = root.members.filter(member => keys.has(member.key));
+    const canonical = options.preferCanonical ? root.members.filter(member => member.key === canonicalKey) : [];
+    const containers = canonical.length ? canonical : root.members.filter(member => keys.has(member.key));
     if (containers.length > 1) return fail();
     const container = containers[0]; if (!container) return { text, root };
     const servers = objectSpan(text, container.valueStart), owned = servers.members.filter(member => member.key === entryName);
@@ -118,7 +119,9 @@ export function createJsonMcpCodec(options: JsonMcpCodecOptions) {
     document(result); return result;
   }
   function put(image: ConfigImage, value: unknown, options: { key?: string; keepEmpty?: boolean; rawValue?: string; emptyContainer?: string } = {}): ConfigImage {
-    const doc = document(image), edits: Edit[] = [], key = options.key ?? canonicalKey;
+    const doc = document(image), edits: Edit[] = [];
+    const hasOtherKey = doc.root.members.some(member => member.key !== canonicalKey && keys.has(member.key));
+    const key = preferCanonical && doc.container?.key === canonicalKey && hasOtherKey ? canonicalKey : options.key ?? canonicalKey;
     if (!doc.container) {
       if (value === undefined && !options.keepEmpty) return image;
       const body = value === undefined ? options.emptyContainer ?? "{}" : `{${JSON.stringify(entryName)}:${options.rawValue ?? JSON.stringify(value)}}`;
@@ -150,7 +153,7 @@ export function createJsonMcpCodec(options: JsonMcpCodecOptions) {
     const pendingLayout = !!original.container && !!installed.container && original.container.key !== installed.container.key && live.container?.key === installed.container.key;
     if (previousRestored && !pendingLayout) return current;
     if (!previousRestored && !isDeepStrictEqual(present, expected)) throw Error(`setup-owned ${label} MCP entry changed; refusing to overwrite it`);
-    const restored = put(current, previous, { key: original.container?.key ?? canonicalKey, keepEmpty: !!original.container && !original.servers!.members.length,
+    const restored = put(current, previous, { key: original.container?.key ?? canonicalKey, keepEmpty: !!original.container,
       ...(original.owned ? { rawValue: original.text.slice(original.owned.valueStart, original.owned.valueEnd) } : {}),
       ...(original.container && !original.servers!.members.length ? { emptyContainer: original.text.slice(original.container.valueStart, original.container.valueEnd) } : {}) });
     return before.bytes === null && !document(restored).root.members.length ? { bytes: null, mode: current.mode } : restored;
