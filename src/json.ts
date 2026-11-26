@@ -131,12 +131,14 @@ export function createJsonMcpCodec(options: JsonMcpCodecOptions) {
     return publish(image, doc, edits);
   }
   /** Canonicalize only the owned container key; all unrelated bytes remain untouched. */
-  function putMcp(image: ConfigImage, value: unknown): ConfigImage { return put(image, value); }
+  function putMcp(image: ConfigImage, value: unknown, options?: { keepEmpty?: boolean }): ConfigImage {
+    return put(image, value, options);
+  }
 
   /** Restore the owned entry (and our alias rename), preserving unrelated lexical edits. */
-  function restoreMcp(before: ConfigImage, after: ConfigImage, current: ConfigImage): ConfigImage {
+  function restoreMcp(before: ConfigImage, after: ConfigImage, current: ConfigImage, options?: { ownedOnly?: boolean }): ConfigImage {
     const original = document(before), installed = document(after), live = document(current);
-    if (same(current, after)) return before;
+    if (!options?.ownedOnly && same(current, after)) return before;
     if (same(current, before)) return current;
     const previous = entry(original), expected = entry(installed), present = entry(live);
     const previousRestored = isDeepStrictEqual(present, previous);

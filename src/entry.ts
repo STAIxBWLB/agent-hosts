@@ -5,6 +5,7 @@ import { createJsonMcpCodec, type ConfigImage } from "./json.ts";
 import { SETUP_CONFIG_BYTES, setTomlPath } from "./toml.ts";
 import { publishImage, readImage, sameImage, withConfigLock } from "./fs-safe.ts";
 import { digest, imageDigest, readReceipt, receiptPath, writeReceipt, type Receipt, type ReceiptTarget } from "./receipt.ts";
+import { readLegacyReceipt, type LegacyReceipt } from "./receipt-legacy.ts";
 
 export interface EntryTarget {
   host: HostId;
@@ -56,7 +57,8 @@ function configCodec({ host, file, name }: ReceiptTarget) {
       canonicalKey: format.key, aliases: format.aliases, entryName: name, label: file,
     });
   }
-  const path = [...format.table, name];
+  const tablePath = format.table;
+  const path = [...tablePath, name];
   const text = (image: ConfigImage) => image.bytes === null ? "" : decoder.decode(Buffer.from(image.bytes, "base64"));
   function read(image: ConfigImage): unknown {
     let value: unknown = Bun.TOML.parse(text(image));
@@ -67,12 +69,17 @@ function configCodec({ host, file, name }: ReceiptTarget) {
     }
     return value;
   }
-  function put(image: ConfigImage, value: unknown): ConfigImage {
+  function put(image: ConfigImage, value: unknown, options?: { keepEmpty?: boolean }): ConfigImage {
     const input = text(image);
-    const output = setTomlPath(input, path, value, { refuseInlineParent: true });
+    let output = setTomlPath(input, path, value, { refuseInlineParent: true });
+    if (value === undefined && options?.keepEmpty === false) {
+      const doc = Bun.TOML.parse(output) as Record<string, unknown>;
+      const parent = doc[tablePath[0]!];
+      if (record(parent) && !Object.keys(parent).length) output = setTomlPath(output, tablePath, undefined);
+    }
     return output === input ? image : { bytes: Buffer.from(output).toString("base64"), mode: image.mode };
   }
-  function restore(before: ConfigImage, _after: ConfigImage, current: ConfigImage): ConfigImage {
+  function restore(before: ConfigImage, _after: ConfigImage, current: ConfigImage, _options?: { ownedOnly?: boolean }): ConfigImage {
     return put(current, read(before));
   }
   return { read, put, restore };
@@ -115,15 +122,15 @@ function result(selection: ReceiptTarget, receipt: string, change: EntryResult["
   return { file: selection.file, receipt, change };
 }
 
-function restoreOwned(receipt: Receipt, current: ConfigImage): ConfigImage {
+function restoreOwned(receipt: ReceiptTarget & Pick<Receipt, "before" | "after">, current: ConfigImage, ownedOnly = false): ConfigImage {
   return editConfig(receipt.file, () => {
     const codec = configCodec(receipt);
     if (!isDeepStrictEqual(codec.read(current), codec.read(receipt.after))) {
       throw new Error("managed entry changed since installation; restore the installed entry or resolve the conflict manually");
     }
-    const restored = current.bytes === receipt.after.bytes
+    const restored = !ownedOnly && current.bytes === receipt.after.bytes
       ? receipt.before
-      : codec.restore(receipt.before, receipt.after, current);
+      : codec.restore(receipt.before, receipt.after, current, { ownedOnly });
     return { bytes: restored.bytes, mode: current.mode };
   });
 }
@@ -180,11 +187,17 @@ export function undoEntry(options: EntryTarget & { receiptDir: string }): EntryR
   const selection = target(options);
   const { file } = selection;
   const path = receiptPath(options.receiptDir, selection);
+  const legacyPaths = options.paths.legacyPaths[selection.host];
   // An absent receipt needs no lock or directory creation.
-  if (!readReceipt(path, selection).receipt) return result(selection, path, "unchanged");
+  if (!readReceipt(path, selection).receipt && !readLegacyReceipt(options.receiptDir, selection, legacyPaths)) {
+    return result(selection, path, "unchanged");
+  }
   return withConfigLock(file, () => {
     const { image, receipt } = readReceipt(path, selection);
-    if (!receipt) return result(selection, path, "unchanged");
+    if (!receipt) {
+      const legacy = readLegacyReceipt(options.receiptDir, selection, legacyPaths);
+      return legacy ? undoLegacy(selection, legacy) : result(selection, path, "unchanged");
+    }
     const current = readImage(file, SETUP_CONFIG_BYTES);
     if (receipt.pending?.kind === "apply") {
       throw new Error(`${path}: an apply is pending; retry the interrupted apply before undoing`);
@@ -203,5 +216,38 @@ export function undoEntry(options: EntryTarget & { receiptDir: string }): EntryR
     publishImage(file, SETUP_CONFIG_BYTES, current, restored);
     writeReceipt(path, journal);
     return result(selection, path, change);
+  });
+}
+
+/** Legacy journals remain with their owner, including agent-mem hook history. */
+function undoLegacy(selection: ReceiptTarget, legacy: LegacyReceipt): EntryResult {
+  const { file } = selection;
+  const current = readImage(file, SETUP_CONFIG_BYTES);
+  return editConfig(file, () => {
+    const codec = configCodec(selection);
+    let prior: unknown;
+    let restored: ConfigImage;
+    if (legacy.kind === "agent-mem") {
+      if (!record(codec.read(legacy.after))) throw new Error("legacy receipt has no installed MCP entry");
+      prior = codec.read(legacy.before);
+      // Legacy writers could reformat siblings or update hooks in the same file.
+      restored = restoreOwned({ ...selection, before: legacy.before, after: legacy.after }, current, true);
+    } else {
+      if (!isDeepStrictEqual(codec.read(current), legacy.installed)) {
+        throw new Error("managed entry changed since installation; restore the installed entry or resolve the conflict manually");
+      }
+      prior = legacy.priorToml === undefined
+        ? legacy.prior
+        : codec.read({ bytes: Buffer.from(legacy.priorToml).toString("base64"), mode: current.mode });
+      if (legacy.priorToml !== undefined && prior === undefined) throw new Error("prior TOML block has no managed entry");
+      restored = codec.put(current, prior, { keepEmpty: legacy.keyExisted });
+      if (!legacy.existed && restored.bytes !== null) {
+        const text = decoder.decode(Buffer.from(restored.bytes, "base64"));
+        const empty = HOSTS[selection.host].format.kind === "toml" ? text.trim() === "" : /^\s*\{\s*\}\s*$/.test(text);
+        if (empty) restored = { bytes: null, mode: current.mode };
+      }
+    }
+    publishImage(file, SETUP_CONFIG_BYTES, current, restored);
+    return result(selection, legacy.path, prior === undefined ? "removed" : "restored");
   });
 }

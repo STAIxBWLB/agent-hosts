@@ -1,0 +1,29 @@
+{
+  "commit": "9b9a4a5333aaa73453858a541b82028c63f8f7f8",
+  "host": "kimi",
+  "name": "vmem",
+  "file": "$FIXTURE/.kimi-code/mcp.json",
+  "receiptDir": "$FIXTURE/vault/setup",
+  "mode": 384,
+  "before": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"keep\"\n    },\n    \"vmem\": {\"command\":\"/fixture/prior\",\"args\":[\"mcp\"]}\n  },\n  \"fixture\": true\n}\n",
+  "after": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"keep\"\n    },\n    \"vmem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+  "receipt": {
+    "version": 1,
+    "target": "kimi",
+    "file": "$FIXTURE/.kimi-code/mcp.json",
+    "existed": true,
+    "keyExisted": true,
+    "prior": {
+      "command": "/fixture/prior",
+      "args": [
+        "mcp"
+      ]
+    },
+    "installed": {
+      "command": "$FIXTURE/bin/bun",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

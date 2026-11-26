@@ -1,0 +1,50 @@
+{
+  "commit": "e37eb63d8be0e681aafb96d290023009d78e53ff",
+  "host": "kimi",
+  "name": "amem",
+  "file": "$FIXTURE/.kimi-code/mcp.json",
+  "receiptDir": "$FIXTURE/memory/setup",
+  "mode": 384,
+  "before": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"keep\"\n    },\n    \"amem\": {\"command\":\"/fixture/prior\",\"args\":[\"mcp\"]}\n  },\n  \"fixture\": true\n}\n",
+  "after": "{\n  \"mcpServers\": {\n    \"other\": {\n      \"command\": \"keep\"\n    },\n    \"amem\": {\n      \"command\": \"$FIXTURE/bin/bun\",\n      \"args\": [\n        \"--smol\",\n        \"$FIXTURE/release/node_modules/@staix/agent-mem/bin/amem.js\",\n        \"mcp\"\n      ]\n    }\n  },\n  \"fixture\": true\n}\n",
+  "receipt": {
+    "version": 1,
+    "target": "kimi",
+    "intent": "250944c933790ef5f14afe4c3ae5b957069edf09f5f4864c857d584b005e1f96",
+    "phase": "applied",
+    "changes": [
+      {
+        "key": "kimi:0",
+        "path": "$FIXTURE/.kimi-code/mcp.json",
+        "before": {
+          "bytes": "ewogICJtY3BTZXJ2ZXJzIjogewogICAgIm90aGVyIjogewogICAgICAiY29tbWFuZCI6ICJrZWVwIgogICAgfSwKICAgICJhbWVtIjogeyJjb21tYW5kIjoiL2ZpeHR1cmUvcHJpb3IiLCJhcmdzIjpbIm1jcCJdfQogIH0sCiAgImZpeHR1cmUiOiB0cnVlCn0K",
+          "mode": 384
+        },
+        "after": {
+          "bytes": "ewogICJtY3BTZXJ2ZXJzIjogewogICAgIm90aGVyIjogewogICAgICAiY29tbWFuZCI6ICJrZWVwIgogICAgfSwKICAgICJhbWVtIjogewogICAgICAiY29tbWFuZCI6ICIkRklYVFVSRS9iaW4vYnVuIiwKICAgICAgImFyZ3MiOiBbCiAgICAgICAgIi0tc21vbCIsCiAgICAgICAgIiRGSVhUVVJFL3JlbGVhc2Uvbm9kZV9tb2R1bGVzL0BzdGFpeC9hZ2VudC1tZW0vYmluL2FtZW0uanMiLAogICAgICAgICJtY3AiCiAgICAgIF0KICAgIH0KICB9LAogICJmaXh0dXJlIjogdHJ1ZQp9Cg==",
+          "mode": 384
+        },
+        "start": {
+          "bytes": "ewogICJtY3BTZXJ2ZXJzIjogewogICAgIm90aGVyIjogewogICAgICAiY29tbWFuZCI6ICJrZWVwIgogICAgfSwKICAgICJhbWVtIjogeyJjb21tYW5kIjoiL2ZpeHR1cmUvcHJpb3IiLCJhcmdzIjpbIm1jcCJdfQogIH0sCiAgImZpeHR1cmUiOiB0cnVlCn0K",
+          "mode": 384
+        }
+      },
+      {
+        "key": "kimi:1",
+        "path": "$FIXTURE/.kimi-code/config.toml",
+        "before": {
+          "bytes": null,
+          "mode": 384
+        },
+        "after": {
+          "bytes": "Imhvb2tzIiA9IFsgeyAiZXZlbnQiID0gIlNlc3Npb25FbmQiLCAiY29tbWFuZCIgPSAiJyRGSVhUVVJFL2Jpbi9idW4nIC0tc21vbCAnJEZJWFRVUkUvcmVsZWFzZS9ub2RlX21vZHVsZXMvQHN0YWl4L2FnZW50LW1lbS9iaW4vYW1lbS5qcycgaW5nZXN0IGtpbWkgLS1qc29uIiwgInRpbWVvdXQiID0gMyB9XQo=",
+          "mode": 384
+        },
+        "start": {
+          "bytes": null,
+          "mode": 384
+        }
+      }
+    ]
+  }
+}
